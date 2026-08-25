@@ -60,14 +60,8 @@ export function Splash({ onDone }: { onDone: () => void }) {
   return (
     <div className={`splash ${phase} ${reduced ? 'splash-reduced' : ''}`}>
       <div className="splash-curtain-left" style={{ backgroundImage: `url(${curtainUrl})` }}>
-        <div className="pleat" />
-        <div className="pleat" />
-        <div className="pleat" />
       </div>
       <div className="splash-curtain-right" style={{ backgroundImage: `url(${curtainUrl})` }}>
-        <div className="pleat" />
-        <div className="pleat" />
-        <div className="pleat" />
       </div>
       <div className="splash-bloom" />
       <div className="splash-quote-wrap">

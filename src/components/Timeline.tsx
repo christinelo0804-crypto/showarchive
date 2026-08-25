@@ -52,12 +52,18 @@ export function Timeline({
     return result
   }, [shows])
 
+  const categoryNameMap = useMemo(
+    () => new Map(categories.map((c) => [c.id, c.name])),
+    [categories]
+  )
+  const cityNameMap = useMemo(() => new Map(cities.map((c) => [c.id, c.name])), [cities])
+  const venueNameMap = useMemo(() => new Map(venues.map((v) => [v.id, v.name])), [venues])
   const showCategoryName = (show: Show) =>
-    categories.find((c) => c.id === show.categoryLevel2Id)?.name ??
-    categories.find((c) => c.id === show.categoryLevel1Id)?.name ??
+    (show.categoryLevel2Id ? categoryNameMap.get(show.categoryLevel2Id) : undefined) ??
+    (show.categoryLevel1Id ? categoryNameMap.get(show.categoryLevel1Id) : undefined) ??
     ''
-  const cityName = (id: string) => cities.find((c) => c.id === id)?.name ?? ''
-  const venueName = (id: string) => venues.find((v) => v.id === id)?.name ?? ''
+  const cityName = (id: string) => cityNameMap.get(id) ?? ''
+  const venueName = (id: string) => venueNameMap.get(id) ?? ''
 
   return (
     <div className="timeline">
@@ -71,7 +77,7 @@ export function Timeline({
                 <Link key={show.id} to={`/shows/${show.id}`} className="timeline-item">
                   <span className="tl-thumb">
                     {show.poster && (show.poster.display || show.poster.thumbnail) ? (
-                      <ImagePreview asset={show.poster} alt="" />
+                      <ImagePreview asset={show.poster} alt="" preferThumb />
                     ) : (
                       <span>{show.title.slice(0, 1)}</span>
                     )}

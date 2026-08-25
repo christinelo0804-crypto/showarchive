@@ -3,6 +3,10 @@ import { Link } from 'react-router-dom'
 import type { Show } from '../types'
 import { coverColors, coverSize } from '../lib/posterCover'
 
+// 模块级图片 URL 缓存：同一演出记录在网格/瀑布流间切换时复用同一条
+// ObjectURL，避免每次切换视图都重新生成、重新解码图片导致闪现。
+const posterUrlCache = new Map<string, string>()
+
 /** 首页海报墙卡片：仅展示海报图片，无任何叠加信息。 */
 export function PosterCard({
   show,
@@ -23,10 +27,25 @@ export function PosterCard({
       setPosterUrl(null)
       return
     }
+    const cacheKey = `${show.id}:${show.updatedAt}`
+    const cached = posterUrlCache.get(cacheKey)
+    if (cached) {
+      setPosterUrl(cached)
+      return
+    }
     const url = URL.createObjectURL(source)
+    posterUrlCache.set(cacheKey, url)
+    // 防止长期使用缓存无限增长：超过 200 条时清理最早的一条
+    if (posterUrlCache.size > 200) {
+      const oldest = posterUrlCache.keys().next().value
+      if (oldest != null) {
+        const oldUrl = posterUrlCache.get(oldest)
+        if (oldUrl) URL.revokeObjectURL(oldUrl)
+        posterUrlCache.delete(oldest)
+      }
+    }
     setPosterUrl(url)
-    return () => URL.revokeObjectURL(url)
-  }, [show.poster])
+  }, [show.id, show.updatedAt, show.poster])
 
   return (
     <Link
