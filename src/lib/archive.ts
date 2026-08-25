@@ -1,5 +1,5 @@
 import JSZip from 'jszip'
-import { db } from '../db/db'
+import { addShowEncoded, db } from '../db/db'
 import { seedIfEmpty } from '../db/seed'
 import { createId, nowIso } from './id'
 import type {
@@ -352,7 +352,7 @@ export async function importReplace(parsed: ParsedArchive): Promise<{ shows: num
       await db.languages.bulkAdd(data.languages)
       await db.ticketChannels.bulkAdd(data.ticketChannels)
       for (const s of data.shows) {
-        await db.shows.add(await exportedShowToShow(parsed, s))
+        await addShowEncoded(await exportedShowToShow(parsed, s))
       }
     }
   )
@@ -475,7 +475,7 @@ export async function importMerge(
         }
         seen.add(key)
         const show = await exportedShowToShow(parsed, s)
-        await db.shows.add({
+        await addShowEncoded({
           ...show,
           id: createId(),
           cityId: cityMap.get(s.cityId) ?? s.cityId,
