@@ -1,5 +1,5 @@
 import JSZip from 'jszip'
-import { addShowEncoded, db } from '../db/db'
+import { db } from '../db/db'
 import { seedIfEmpty } from '../db/seed'
 import { createId, nowIso } from './id'
 import type {
@@ -12,6 +12,7 @@ import type {
   TicketChannel,
   Venue
 } from '../types'
+import type { StoredImageAsset, StoredShow } from '../db/imageCodec'
 
 const FORMAT_VERSION = 1
 const ARCHIVE_APP = 'ShowArchive'
@@ -282,19 +283,20 @@ export async function previewMerge(data: ArchiveData): Promise<{ newCount: numbe
   return { newCount, duplicateCount }
 }
 
-async function readAsset(zip: JSZip, ref: ExportedImageRef | undefined): Promise<ImageAsset | undefined> {
+async function readAsset(zip: JSZip, ref: ExportedImageRef | undefined): Promise<StoredImageAsset | undefined> {
   if (!ref) return undefined
-  const read = async (path?: string): Promise<Blob | undefined> => {
+  const read = async (path?: string): Promise<ArrayBuffer | undefined> => {
     if (!path) return undefined
     const file = zip.file(path)
-    return file ? (await file.async('blob')) as Blob : undefined
+    // 直接读 ArrayBuffer，避免在 iOS Safari 上构造/读取 Blob（WebKit 已知不可靠）
+    return file ? (await file.async('arraybuffer')) as ArrayBuffer : undefined
   }
   const [thumbnail, display] = await Promise.all([read(ref.thumbPath), read(ref.displayPath)])
   if (!thumbnail && !display) return undefined
   return { thumbnail, display, contentType: ref.contentType, width: ref.width, height: ref.height }
 }
 
-async function exportedShowToShow(parsed: ParsedArchive, s: ExportedShow): Promise<Show> {
+async function exportedShowToShow(parsed: ParsedArchive, s: ExportedShow): Promise<StoredShow> {
   const noteImages = await Promise.all((s.noteImages ?? []).map((r) => readAsset(parsed.zip, r)))
   const [poster, ticketImage, seatViewImage] = await Promise.all([
     readAsset(parsed.zip, s.poster),
@@ -315,7 +317,7 @@ async function exportedShowToShow(parsed: ParsedArchive, s: ExportedShow): Promi
     poster,
     ticketImage,
     seatViewImage,
-    noteImages: noteImages.filter((a): a is ImageAsset => a != null),
+    noteImages: noteImages.filter((a): a is StoredImageAsset => a != null),
     languageId: s.languageId,
     seat: s.seat,
     cast: s.cast,
@@ -334,6 +336,12 @@ async function exportedShowToShow(parsed: ParsedArchive, s: ExportedShow): Promi
 /** 替换导入：清空全部数据后写入档案内容（含设置）。 */
 export async function importReplace(parsed: ParsedArchive): Promise<{ shows: number; media: number }> {
   const { data } = parsed
+  // 在事务外完成所有图片解压与编码（Dexie 事务内不宜执行非数据库异步操作；
+  // iOS 上在事务内构造 Blob/读压缩包会失败）
+  const preparedShows: StoredShow[] = []
+  for (const s of data.shows) {
+    preparedShows.push(await exportedShowToShow(parsed, s))
+  }
   await db.transaction(
     'rw',
     [db.shows, db.categories, db.cities, db.venues, db.languages, db.ticketChannels],
@@ -351,9 +359,7 @@ export async function importReplace(parsed: ParsedArchive): Promise<{ shows: num
       await db.venues.bulkAdd(data.venues)
       await db.languages.bulkAdd(data.languages)
       await db.ticketChannels.bulkAdd(data.ticketChannels)
-      for (const s of data.shows) {
-        await addShowEncoded(await exportedShowToShow(parsed, s))
-      }
+      if (preparedShows.length > 0) await db.shows.bulkAdd(preparedShows as unknown as Show[])
     }
   )
   if ((await db.categories.count()) === 0) await seedIfEmpty()
@@ -447,6 +453,11 @@ export async function importMerge(
   parsed: ParsedArchive
 ): Promise<{ added: number; skipped: number }> {
   const { data } = parsed
+  // 事务外预解压所有演出图片（避免在 Dexie 事务内做非数据库异步操作）
+  const preparedShows: StoredShow[] = []
+  for (const s of data.shows) {
+    preparedShows.push(await exportedShowToShow(parsed, s))
+  }
   let added = 0
   let skipped = 0
   await db.transaction(
@@ -467,15 +478,15 @@ export async function importMerge(
       const importedVenueName = new Map(data.venues.map((v) => [v.id, v.name]))
       const seen = new Set<string>()
 
-      for (const s of data.shows) {
+      for (const [index, s] of data.shows.entries()) {
         const key = makeKey(s.title, s.date, s.time, importedVenueName.get(s.venueId) ?? '')
         if (existingKeys.has(key) || seen.has(key)) {
           skipped++
           continue
         }
         seen.add(key)
-        const show = await exportedShowToShow(parsed, s)
-        await addShowEncoded({
+        const show = preparedShows[index]
+        await db.shows.add({
           ...show,
           id: createId(),
           cityId: cityMap.get(s.cityId) ?? s.cityId,
@@ -489,7 +500,7 @@ export async function importMerge(
             ? (channelMap.get(s.ticketChannelId) ?? s.ticketChannelId)
             : undefined,
           updatedAt: nowIso()
-        })
+        } as unknown as Show)
         added++
       }
     }
