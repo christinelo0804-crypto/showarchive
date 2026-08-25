@@ -67,6 +67,12 @@ export default function HomePage() {
     return columns
   }, [shows])
 
+  const categoryNameMap = useMemo(
+    () => new Map((categories ?? []).map((c) => [c.id, c.name])),
+    [categories]
+  )
+  const categoryNameOf = (id?: string) => (id ? categoryNameMap.get(id) ?? '' : '')
+
   function switchWall(next: 'grid' | 'masonry') {
     setWallStyle(next)
     try {
@@ -116,7 +122,7 @@ export default function HomePage() {
                 key={show.id}
                 show={show}
                 variant="grid"
-                categoryName={categories?.find((c) => c.id === show.categoryLevel1Id)?.name ?? ''}
+                categoryName={categoryNameOf(show.categoryLevel1Id)}
               />
             ))}
           </div>
@@ -129,9 +135,7 @@ export default function HomePage() {
                     <PosterCard
                       show={show}
                       variant="masonry"
-                      categoryName={
-                        categories?.find((c) => c.id === show.categoryLevel1Id)?.name ?? ''
-                      }
+                      categoryName={categoryNameOf(show.categoryLevel1Id)}
                     />
                   </Reveal>
                 ))}

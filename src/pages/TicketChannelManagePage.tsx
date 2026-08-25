@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import {
@@ -28,7 +28,15 @@ export default function TicketChannelManagePage() {
   const [deleteTarget, setDeleteTarget] = useState<TicketChannel | null>(null)
   const [deleteToId, setDeleteToId] = useState('')
 
-  const countOf = (id: string) => (shows ?? []).filter((s) => s.ticketChannelId === id).length
+  const countMap = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const s of shows ?? []) {
+      if (!s.ticketChannelId) continue
+      map.set(s.ticketChannelId, (map.get(s.ticketChannelId) ?? 0) + 1)
+    }
+    return map
+  }, [shows])
+  const countOf = (id: string) => countMap.get(id) ?? 0
   const sorted = [...(channels ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
   const q = query.trim().toLowerCase()
   const visible = sorted.filter((c) => !q || c.name.toLowerCase().includes(q))

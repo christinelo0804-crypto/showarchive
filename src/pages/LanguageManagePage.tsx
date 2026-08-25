@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import {
@@ -28,7 +28,15 @@ export default function LanguageManagePage() {
   const [deleteTarget, setDeleteTarget] = useState<Language | null>(null)
   const [deleteToId, setDeleteToId] = useState('')
 
-  const countOf = (id: string) => (shows ?? []).filter((s) => s.languageId === id).length
+  const countMap = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const s of shows ?? []) {
+      if (!s.languageId) continue
+      map.set(s.languageId, (map.get(s.languageId) ?? 0) + 1)
+    }
+    return map
+  }, [shows])
+  const countOf = (id: string) => countMap.get(id) ?? 0
   const sorted = [...(languages ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
   const q = query.trim().toLowerCase()
   const visible = sorted.filter((l) => !q || l.name.toLowerCase().includes(q))

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import {
@@ -40,8 +40,18 @@ export default function CategoryManagePage() {
   const level1 = (categories ?? []).filter((c) => !c.parentId).sort(compareCategory)
   const childrenOf = (id: string) =>
     (categories ?? []).filter((c) => c.parentId === id).sort(compareCategory)
-  const countOf = (id: string) =>
-    (shows ?? []).filter((s) => s.categoryLevel1Id === id || s.categoryLevel2Id === id).length
+  // 一次遍历建立「分类 → 演出数量」映射，避免每次渲染都重复遍历全部演出
+  const countMap = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const s of shows ?? []) {
+      for (const id of [s.categoryLevel1Id, s.categoryLevel2Id]) {
+        if (!id) continue
+        map.set(id, (map.get(id) ?? 0) + 1)
+      }
+    }
+    return map
+  }, [shows])
+  const countOf = (id: string) => countMap.get(id) ?? 0
   const childCountOf = (id: string) => childrenOf(id).length
 
   function targetOptions(c: Category): Category[] {

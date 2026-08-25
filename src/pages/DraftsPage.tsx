@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
@@ -15,6 +15,8 @@ export default function DraftsPage() {
   const venues = useLiveQuery(() => db.venues.toArray(), [])
   const [pendingDelete, setPendingDelete] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const cityNameMap = useMemo(() => new Map((cities ?? []).map((c) => [c.id, c.name])), [cities])
+  const venueNameMap = useMemo(() => new Map((venues ?? []).map((v) => [v.id, v.name])), [venues])
 
   async function handleDelete() {
     if (!pendingDelete) return
@@ -40,8 +42,8 @@ export default function DraftsPage() {
       ) : (
         <div className="show-list">
           {drafts.map((d) => {
-            const cityName = cities?.find((c) => c.id === d.cityId)?.name ?? ''
-            const venueName = venues?.find((v) => v.id === d.venueId)?.name ?? ''
+            const cityName = cityNameMap.get(d.cityId) ?? ''
+            const venueName = venueNameMap.get(d.venueId) ?? ''
             return (
               <div key={d.id} className="show-row draft-card">
                 <div className="draft-card-main">
@@ -52,12 +54,14 @@ export default function DraftsPage() {
                       {venueName} · {cityName}
                     </span>
                   </span>
-                  <Link className="btn btn-ghost" to={`/shows/${d.id}/edit`}>
-                    继续编辑
-                  </Link>
-                  <Button type="button" variant="danger" onClick={() => setPendingDelete(d.id)}>
-                    删除
-                  </Button>
+                  <span className="draft-card-actions">
+                    <Link className="btn btn-ghost" to={`/shows/${d.id}/edit`}>
+                      继续编辑
+                    </Link>
+                    <Button type="button" variant="danger" onClick={() => setPendingDelete(d.id)}>
+                      删除
+                    </Button>
+                  </span>
                 </div>
                 <div className="draft-updated">更新于 {d.updatedAt.slice(0, 10)}</div>
               </div>

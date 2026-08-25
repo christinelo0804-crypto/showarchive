@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
@@ -48,6 +48,22 @@ export default function ShowDetailPage() {
     return () => document.removeEventListener('mousedown', onDocClick)
   }, [menuOpen])
 
+  // 注意：所有 Hooks 必须在条件返回之前调用，避免 React Hooks 顺序错误。
+  const cityNameMap = useMemo(() => new Map((cities ?? []).map((c) => [c.id, c.name])), [cities])
+  const venueNameMap = useMemo(() => new Map((venues ?? []).map((v) => [v.id, v.name])), [venues])
+  const categoryNameMap = useMemo(
+    () => new Map((categories ?? []).map((c) => [c.id, c.name])),
+    [categories]
+  )
+  const languageNameMap = useMemo(
+    () => new Map((languages ?? []).map((l) => [l.id, l.name])),
+    [languages]
+  )
+  const channelNameMap = useMemo(
+    () => new Map((channels ?? []).map((c) => [c.id, c.name])),
+    [channels]
+  )
+
   if (!show) {
     return (
       <div className="page">
@@ -56,19 +72,13 @@ export default function ShowDetailPage() {
     )
   }
 
-  const cityName = cities?.find((c) => c.id === show.cityId)?.name ?? ''
-  const venueName = venues?.find((v) => v.id === show.venueId)?.name ?? ''
-  const category2Name = show.categoryLevel2Id
-    ? categories?.find((c) => c.id === show.categoryLevel2Id)?.name
-    : null
-  const category1Name = categories?.find((c) => c.id === show.categoryLevel1Id)?.name ?? null
+  const cityName = show.cityId ? cityNameMap.get(show.cityId) ?? '' : ''
+  const venueName = show.venueId ? venueNameMap.get(show.venueId) ?? '' : ''
+  const category2Name = show.categoryLevel2Id ? categoryNameMap.get(show.categoryLevel2Id) : undefined
+  const category1Name = show.categoryLevel1Id ? categoryNameMap.get(show.categoryLevel1Id) : undefined
   const displayCategoryName = category2Name ?? category1Name
-  const languageName = show.languageId
-    ? languages?.find((l) => l.id === show.languageId)?.name
-    : null
-  const channelName = show.ticketChannelId
-    ? channels?.find((c) => c.id === show.ticketChannelId)?.name
-    : null
+  const languageName = show.languageId ? languageNameMap.get(show.languageId) : undefined
+  const channelName = show.ticketChannelId ? channelNameMap.get(show.ticketChannelId) : undefined
   const noteImages = show.noteImages ?? []
   const noteLabels = noteImages.map((_, i) => `图${i + 1}`)
   const posterAsset = show.poster

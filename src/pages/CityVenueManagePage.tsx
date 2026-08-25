@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import {
@@ -42,9 +42,24 @@ export default function CityVenueManagePage() {
   const [deleteTarget, setDeleteTarget] = useState<Target | null>(null)
   const [deleteToId, setDeleteToId] = useState('')
 
-  const cityShowCount = (id: string) => (shows ?? []).filter((s) => s.cityId === id).length
-  const cityVenueCount = (id: string) => (venues ?? []).filter((v) => v.cityId === id).length
-  const venueShowCount = (id: string) => (shows ?? []).filter((s) => s.venueId === id).length
+  const cityShowMap = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const s of shows ?? []) map.set(s.cityId, (map.get(s.cityId) ?? 0) + 1)
+    return map
+  }, [shows])
+  const cityVenueMap = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const v of venues ?? []) map.set(v.cityId, (map.get(v.cityId) ?? 0) + 1)
+    return map
+  }, [venues])
+  const venueShowMap = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const s of shows ?? []) map.set(s.venueId, (map.get(s.venueId) ?? 0) + 1)
+    return map
+  }, [shows])
+  const cityShowCount = (id: string) => cityShowMap.get(id) ?? 0
+  const cityVenueCount = (id: string) => cityVenueMap.get(id) ?? 0
+  const venueShowCount = (id: string) => venueShowMap.get(id) ?? 0
 
   const sortedCities = [...(cities ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
   const sortedVenues = [...(venues ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))

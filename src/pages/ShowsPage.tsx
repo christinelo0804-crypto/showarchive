@@ -27,6 +27,7 @@ export default function ShowsPage() {
   const [year, setYear] = useState(() => new Date().getFullYear())
   const [month, setMonth] = useState(() => new Date().getMonth())
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [daySheetOpen, setDaySheetOpen] = useState(false)
 
   const shows = useLiveQuery(() => activeShows(), [])
   const drafts = useLiveQuery(() => draftShows(), [])
@@ -34,11 +35,17 @@ export default function ShowsPage() {
   const cities = useLiveQuery(() => db.cities.toArray(), [])
   const venues = useLiveQuery(() => db.venues.toArray(), [])
 
-  const cityName = (id: string) => cities?.find((c) => c.id === id)?.name ?? ''
-  const venueName = (id: string) => venues?.find((v) => v.id === id)?.name ?? ''
+  const cityNameMap = useMemo(() => new Map((cities ?? []).map((c) => [c.id, c.name])), [cities])
+  const venueNameMap = useMemo(() => new Map((venues ?? []).map((v) => [v.id, v.name])), [venues])
+  const categoryNameMap = useMemo(
+    () => new Map((categories ?? []).map((c) => [c.id, c.name])),
+    [categories]
+  )
+  const cityName = (id: string) => cityNameMap.get(id) ?? ''
+  const venueName = (id: string) => venueNameMap.get(id) ?? ''
   const showCategoryName = (show: Show) =>
-    categories?.find((c) => c.id === show.categoryLevel2Id)?.name ??
-    categories?.find((c) => c.id === show.categoryLevel1Id)?.name ??
+    (show.categoryLevel2Id ? categoryNameMap.get(show.categoryLevel2Id) : undefined) ??
+    (show.categoryLevel1Id ? categoryNameMap.get(show.categoryLevel1Id) : undefined) ??
     ''
   const bySort = (a: { sortOrder: number; name: string }, b: { sortOrder: number; name: string }) =>
     a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'zh-CN')
@@ -100,7 +107,7 @@ export default function ShowsPage() {
   function MiniPoster({ show }: { show: Show }) {
     const poster = show.poster
     if (poster && (poster.display || poster.thumbnail)) {
-      return <ImagePreview asset={poster} alt="" className="cal-poster-img" />
+      return <ImagePreview asset={poster} alt="" className="cal-poster-img" preferThumb />
     }
     const colors = coverColors(
       show.title,
@@ -119,6 +126,7 @@ export default function ShowsPage() {
     setYear(next.getFullYear())
     setMonth(next.getMonth())
     setSelectedDate(null)
+    setDaySheetOpen(false)
   }
 
   return (
@@ -226,9 +234,26 @@ export default function ShowsPage() {
                   className={`cal-day ${dayList.length > 0 ? 'cal-has-show' : ''} ${
                     selectedDate === date ? 'cal-selected' : ''
                   }`}
-                  onClick={() => setSelectedDate(date)}
+                  onClick={() => {
+                    // 日历本身已显示当天有无演出，无演出日期不弹抽屉
+                    if (dayList.length === 0) return
+                    setSelectedDate(date)
+                    setDaySheetOpen(true)
+                  }}
                 >
                   <span className="cal-day-num">{Number(date.slice(-2))}</span>
+                  {dayList.length > 0 && (
+                    <span className="cal-dots">
+                      {dayList.slice(0, 3).map((s) => (
+                        <i
+                          key={s.id}
+                          className={`cal-dot ${
+                            s.status === 'upcoming' ? 'cal-dot-upcoming' : 'cal-dot-watched'
+                          }`}
+                        />
+                      ))}
+                    </span>
+                  )}
                   {dayList.length > 0 && (
                     <span className="cal-poster">
                       <MiniPoster show={dayList[0]} />
@@ -239,30 +264,6 @@ export default function ShowsPage() {
               )
             })}
           </div>
-          {selectedDate &&
-            (dayShows.length === 0 ? (
-              <>
-                <h2 className="section-title">当天记录</h2>
-                <p className="muted">当天没有记录。</p>
-              </>
-            ) : (
-              <>
-                <h2 className="section-title">当天记录</h2>
-                <div className="show-list">
-                  {dayShows.map((show) => (
-                    <Link key={show.id} to={`/shows/${show.id}`} className="show-row">
-                      <span className="show-date">{formatDateWithYear(show.date)}</span>
-                      <span className="show-body">
-                        <span className="show-name">{show.title}</span>
-                        <span className="show-sub">
-                          {showCategoryName(show)} · {cityName(show.cityId)} · {venueName(show.venueId)}
-                        </span>
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              </>
-            ))}
         </>
       ) : filtered.length === 0 ? (
         <EmptyState title="没有符合条件的记录" hint="换个关键词，或先新增一条记录。" />
@@ -364,6 +365,59 @@ export default function ShowsPage() {
               <Button type="button" onClick={() => setFilterOpen(false)}>
                 完成
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {daySheetOpen && selectedDate && (
+        <div className="drawer-overlay" onClick={() => setDaySheetOpen(false)}>
+          <div className="drawer day-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="day-sheet-head">
+              <h3>{formatDateWithYear(selectedDate)}</h3>
+              <span className="day-sheet-count">{dayShows.length} 场演出</span>
+              <button
+                type="button"
+                className="day-sheet-close"
+                onClick={() => setDaySheetOpen(false)}
+                aria-label="关闭"
+              >
+                ×
+              </button>
+            </div>
+            <div className="day-sheet-list">
+              {dayShows.map((show) => {
+                const poster = show.poster
+                const colors = coverColors(
+                  show.title,
+                  categories?.find((c) => c.id === show.categoryLevel1Id)?.name ?? ''
+                )
+                return (
+                  <Link key={show.id} to={`/shows/${show.id}`} className="day-sheet-item">
+                    <span className="day-sheet-thumb">
+                      {poster && (poster.display || poster.thumbnail) ? (
+                        <ImagePreview asset={poster} alt="" className="day-sheet-thumb-img" preferThumb />
+                      ) : (
+                        <span
+                          style={{
+                            display: 'block',
+                            width: '100%',
+                            height: '100%',
+                            background: `linear-gradient(155deg, ${colors[0]}, ${colors[1]})`
+                          }}
+                        />
+                      )}
+                    </span>
+                    <span className="day-sheet-body">
+                      <span className="day-sheet-name">{show.title}</span>
+                      <span className="day-sheet-sub">
+                        {showCategoryName(show)} · {cityName(show.cityId)} · {venueName(show.venueId)}
+                      </span>
+                    </span>
+                    <span className="day-sheet-arrow">›</span>
+                  </Link>
+                )
+              })}
             </div>
           </div>
         </div>

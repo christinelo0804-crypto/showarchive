@@ -61,16 +61,18 @@ export default function RecycleBinPage() {
                 <span className="show-body">
                   <span className="show-name">{show.title}</span>
                 </span>
-                <Button type="button" variant="ghost" onClick={() => void handleRestore(show.id)}>
-                  恢复
-                </Button>
-                <Button
-                  type="button"
-                  variant="danger"
-                  onClick={() => setConfirmAction({ type: 'purge', id: show.id })}
-                >
-                  永久删除
-                </Button>
+                <span className="draft-card-actions">
+                  <Button type="button" variant="ghost" onClick={() => void handleRestore(show.id)}>
+                    恢复
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    onClick={() => setConfirmAction({ type: 'purge', id: show.id })}
+                  >
+                    永久删除
+                  </Button>
+                </span>
               </div>
               <div className="draft-updated">删除于 {show.deletedAt?.slice(0, 10)}</div>
             </div>
