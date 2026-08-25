@@ -1,4 +1,4 @@
-import { db } from './db'
+import { db, putShowEncoded } from './db'
 import { createId, nowIso } from '../lib/id'
 import type { Category } from '../types'
 import { setCurrentVersion } from './defaultCategories'
@@ -131,12 +131,12 @@ async function dedupeCategories(): Promise<void> {
         for (const s of asLevel1) {
           s.categoryLevel1Id = keep.id
           s.updatedAt = now
-          await db.shows.put(s)
+          await putShowEncoded(s)
         }
         for (const s of asLevel2) {
           s.categoryLevel2Id = keep.id
           s.updatedAt = now
-          await db.shows.put(s)
+          await putShowEncoded(s)
         }
         await db.categories.delete(dup.id)
       })
@@ -163,7 +163,7 @@ async function dedupeCategories(): Promise<void> {
         for (const s of asLevel2) {
           s.categoryLevel2Id = keep.id
           s.updatedAt = now
-          await db.shows.put(s)
+          await putShowEncoded(s)
         }
         await db.categories.delete(dup.id)
       })

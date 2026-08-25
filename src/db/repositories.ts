@@ -1,4 +1,4 @@
-import { db } from './db'
+import { addShowEncoded, db, putShowEncoded } from './db'
 import { createId, nowIso } from '../lib/id'
 import type { Category, ImageAsset, Show } from '../types'
 
@@ -29,7 +29,7 @@ export interface ShowPayload {
 
 export async function saveShow(input: ShowPayload, opts: { publish: boolean }): Promise<void> {
   const now = nowIso()
-  await db.shows.add({
+  await addShowEncoded({
     id: createId(),
     title: input.title.trim(),
     date: input.date,
@@ -62,7 +62,7 @@ export async function saveShow(input: ShowPayload, opts: { publish: boolean }): 
 export async function updateShow(id: string, input: ShowPayload, opts: { publish: boolean }): Promise<void> {
   const existing = await db.shows.get(id)
   if (!existing) throw new Error('记录不存在或已删除')
-  await db.shows.put({
+  await putShowEncoded({
     ...existing,
     title: input.title.trim(),
     date: input.date,
@@ -222,12 +222,12 @@ export async function migrateCategoryRecords(sourceId: string, targetId: string)
     for (const show of asLevel1) {
       show.categoryLevel1Id = targetId
       show.updatedAt = now
-      await db.shows.put(show)
+      await putShowEncoded(show)
     }
     for (const show of asLevel2) {
       show.categoryLevel2Id = targetId
       show.updatedAt = now
-      await db.shows.put(show)
+      await putShowEncoded(show)
     }
     affected = asLevel1.length + asLevel2.length
   })
@@ -254,12 +254,12 @@ export async function deleteCategory(id: string, migrateTargetId?: string): Prom
       for (const show of asLevel1) {
         show.categoryLevel1Id = migrateTargetId
         show.updatedAt = now
-        await db.shows.put(show)
+        await putShowEncoded(show)
       }
       for (const show of asLevel2) {
         show.categoryLevel2Id = migrateTargetId
         show.updatedAt = now
-        await db.shows.put(show)
+        await putShowEncoded(show)
       }
       migrated = asLevel1.length + asLevel2.length
     }
@@ -301,7 +301,7 @@ export async function migrateCity(
     for (const show of showList) {
       show.cityId = targetId
       show.updatedAt = now
-      await db.shows.put(show)
+      await putShowEncoded(show)
     }
     for (const venue of venueList) {
       venue.cityId = targetId
@@ -331,7 +331,7 @@ export async function deleteCity(
       for (const show of showList) {
         show.cityId = migrateTargetId
         show.updatedAt = now
-        await db.shows.put(show)
+        await putShowEncoded(show)
       }
       for (const venue of venueList) {
         venue.cityId = migrateTargetId
@@ -377,7 +377,7 @@ export async function migrateVenue(sourceId: string, targetId: string): Promise<
     for (const show of list) {
       show.venueId = targetId
       show.updatedAt = now
-      await db.shows.put(show)
+      await putShowEncoded(show)
     }
     affected = list.length
   })
@@ -396,7 +396,7 @@ export async function deleteVenue(id: string, migrateTargetId?: string): Promise
       for (const show of list) {
         show.venueId = migrateTargetId
         show.updatedAt = now
-        await db.shows.put(show)
+        await putShowEncoded(show)
       }
       migrated = list.length
     }
@@ -464,7 +464,7 @@ export async function migrateLanguageRecords(sourceId: string, targetId: string)
     for (const show of list) {
       show.languageId = targetId
       show.updatedAt = now
-      await db.shows.put(show)
+      await putShowEncoded(show)
     }
     affected = list.length
   })
@@ -483,7 +483,7 @@ export async function deleteLanguage(id: string, migrateTargetId?: string): Prom
       for (const show of list) {
         show.languageId = migrateTargetId
         show.updatedAt = now
-        await db.shows.put(show)
+        await putShowEncoded(show)
       }
       migrated = list.length
     }
@@ -534,7 +534,7 @@ export async function migrateTicketChannelRecords(
     for (const show of list) {
       show.ticketChannelId = targetId
       show.updatedAt = now
-      await db.shows.put(show)
+      await putShowEncoded(show)
     }
     affected = list.length
   })
@@ -553,7 +553,7 @@ export async function deleteTicketChannel(id: string, migrateTargetId?: string):
       for (const show of list) {
         show.ticketChannelId = migrateTargetId
         show.updatedAt = now
-        await db.shows.put(show)
+        await putShowEncoded(show)
       }
       migrated = list.length
     }
