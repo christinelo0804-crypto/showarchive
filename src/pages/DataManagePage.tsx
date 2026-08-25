@@ -53,7 +53,14 @@ export default function DataManagePage() {
   async function handleFilePicked(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ''
-    if (!file) return
+    if (!file) {
+      toast.push('error', '未获取到所选文件，请重新选择；若仍失败可尝试先在 iPhone 的「文件」App 中打开一次该档案')
+      return
+    }
+    if (file.size === 0) {
+      toast.push('error', `所选文件「${file.name}」内容为空（0 字节），请确认档案已完整传输到本机后重试`)
+      return
+    }
     setBusy(true)
     try {
       const parsedFile = await parseArchiveFile(file)
