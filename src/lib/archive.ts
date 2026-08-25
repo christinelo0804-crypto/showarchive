@@ -207,11 +207,20 @@ export function downloadBlob(blob: Blob, filename: string): void {
 }
 
 export async function parseArchiveFile(file: Blob): Promise<ParsedArchive> {
+  if (file instanceof File && file.size === 0) {
+    throw new Error(`所选文件「${file.name}」内容为空（0 字节），请确认档案已完整保存到本机后重试`)
+  }
   let zip: JSZip
   try {
-    zip = await JSZip.loadAsync(file)
+    // iOS 26.5 的 WebKit 在 Service Worker 控制的页面中，直接读取磁盘文件
+    // 可能返回空数据；先转为 ArrayBuffer 再解压，兼容性更好。
+    const buffer = await file.arrayBuffer()
+    if (buffer.byteLength === 0) throw new Error('empty-file')
+    zip = await JSZip.loadAsync(buffer)
   } catch {
-    throw new Error('无法读取文件，请确认选择的是 .showarchive 档案')
+    const name = file instanceof File ? file.name : '未知文件'
+    const size = file.size
+    throw new Error(`无法读取文件「${name}」（${size} 字节），请确认选择的是 .showarchive 档案，且文件已完整下载到本机`)
   }
   const manifestFile = zip.file('manifest.json')
   if (!manifestFile) throw new Error('不是有效的 ShowArchive 档案（缺少 manifest.json）')
