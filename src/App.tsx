@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { useState } from 'react'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import Layout from './components/Layout'
 import { ToastProvider } from './components/Toast'
 import DefaultCategoryMigrationGate from './components/DefaultCategoryMigrationGate'
@@ -35,6 +35,17 @@ function Loading() {
   )
 }
 
+/** 路由切换时回到页面顶部，避免从设置页中部进入管理页仍停留在原滚动位置。 */
+function ScrollToTop() {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    const main = document.querySelector<HTMLElement>('.app-main')
+    if (main) main.scrollTop = 0
+    else window.scrollTo(0, 0)
+  }, [pathname])
+  return null
+}
+
 export default function App() {
   const [splashDone, setSplashDone] = useState(false)
 
@@ -51,6 +62,7 @@ export default function App() {
     <>
       {!splashDone && <Splash onDone={() => setSplashDone(true)} />}
       <BrowserRouter basename={routerBasename}>
+        <ScrollToTop />
         <ToastProvider>
           <DefaultCategoryMigrationGate />
           <Suspense fallback={<Loading />}>
