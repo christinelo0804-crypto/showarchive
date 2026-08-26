@@ -22,7 +22,8 @@ export function PosterCard({
   const size = coverSize(show.title)
 
   useEffect(() => {
-    const source = show.poster?.display ?? show.poster?.thumbnail
+    // 海报墙卡片尺寸小，优先用 400px 缩略图，避免加载 1600px 大图解码卡顿
+    const source = show.poster?.thumbnail ?? show.poster?.display
     if (!source) {
       setPosterUrl(null)
       return

@@ -268,7 +268,7 @@ function NoteImagesField({
         </div>
       )}
       {images.length < 10 && (
-        <label className="upload-zone upload-zone-small">
+        <label className="upload-zone">
           <input type="file" accept="image/*" multiple onChange={(e) => void handleFiles(e)} hidden />
           <span>＋ 添加备注图片（{images.length}/10）</span>
         </label>
@@ -506,7 +506,7 @@ export function ShowForm({
   }
 
   return (
-    <div className="page">
+    <div className="page form-page">
       <PageHeader
         eyebrow={mode === 'edit' ? 'Edit Entry' : 'New Entry'}
         title={mode === 'edit' ? '编辑演出' : '新增演出'}

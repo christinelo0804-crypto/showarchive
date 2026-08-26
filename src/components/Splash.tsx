@@ -17,6 +17,7 @@ export function Splash({ onDone }: { onDone: () => void }) {
   const showTrans = quote.lang !== '中文' && quote.lang !== '英语' && Boolean(quote.translation)
   const size = sizeClass(quote.original.length)
   const [phase, setPhase] = useState<'closed' | 'opening' | 'leaving'>('closed')
+  const [curtainReady, setCurtainReady] = useState(false)
   const doneRef = useRef(false)
   const reduced = useMemo(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
@@ -29,6 +30,27 @@ export function Splash({ onDone }: { onDone: () => void }) {
     document.body.style.overflow = 'hidden'
     return () => {
       document.body.style.overflow = prev
+    }
+  }, [])
+
+  // 预解码幕布贴图：避免动画播放时才解码导致卡顿
+  useEffect(() => {
+    const img = new Image()
+    img.decoding = 'async'
+    img.src = curtainUrl
+    const onReady = () => setCurtainReady(true)
+    if (img.decode) {
+      img
+        .decode()
+        .then(onReady)
+        .catch(() => onReady())
+    } else {
+      img.onload = onReady
+      img.onerror = onReady
+    }
+    return () => {
+      img.onload = null
+      img.onerror = null
     }
   }, [])
 
@@ -59,10 +81,26 @@ export function Splash({ onDone }: { onDone: () => void }) {
 
   return (
     <div className={`splash ${phase} ${reduced ? 'splash-reduced' : ''}`}>
-      <div className="splash-curtain-left" style={{ backgroundImage: `url(${curtainUrl})` }}>
-      </div>
-      <div className="splash-curtain-right" style={{ backgroundImage: `url(${curtainUrl})` }}>
-      </div>
+      {curtainReady && (
+        <>
+          <img
+            className="splash-curtain-left"
+            src={curtainUrl}
+            alt=""
+            decoding="async"
+            fetchPriority="high"
+            draggable={false}
+          />
+          <img
+            className="splash-curtain-right"
+            src={curtainUrl}
+            alt=""
+            decoding="async"
+            fetchPriority="high"
+            draggable={false}
+          />
+        </>
+      )}
       <div className="splash-bloom" />
       <div className="splash-quote-wrap">
         <div className={`splash-quote size-${size}`}>
