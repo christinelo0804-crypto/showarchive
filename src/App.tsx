@@ -6,6 +6,7 @@ import { ToastProvider } from './components/Toast'
 import DefaultCategoryMigrationGate from './components/DefaultCategoryMigrationGate'
 import { Splash } from './components/Splash'
 import { seedIfEmpty } from './db/seed'
+import { applyTheme } from './lib/theme'
 
 const routerBasename =
   import.meta.env.BASE_URL === '/' ? '/' : import.meta.env.BASE_URL.replace(/\/+$/, '')
@@ -55,7 +56,7 @@ export default function App() {
 
   useEffect(() => {
     const stored = localStorage.getItem('showarchive-theme')
-    document.documentElement.dataset.theme = stored === 'light' ? 'light' : 'dark'
+    applyTheme(stored === 'light' ? 'light' : 'dark')
   }, [])
 
   return (
