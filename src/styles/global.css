@@ -51,6 +51,19 @@ a {
     linear-gradient(160deg, var(--color-bg-0), var(--color-bg-1));
 }
 
+/* iOS 独立模式（主屏幕 PWA）冷启动时，WebKit 可能先按偏矮的视口布局，
+   dvh/svh 会少算底部安全区，露出黑边（WebKit bug 254868）；
+   此时只有 vh 能解析为包含安全区的真实全屏，故独立模式下改用 vh。
+   Safari 标签页打开时仍用 dvh，不受影响。 */
+@media (display-mode: standalone) {
+  body {
+    min-height: 100vh;
+  }
+  .app-shell {
+    height: 100vh;
+  }
+}
+
 .app-main {
   flex: 1;
   min-height: 0;
