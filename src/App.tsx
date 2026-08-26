@@ -59,6 +59,29 @@ export default function App() {
     applyTheme(stored === 'light' ? 'light' : 'dark')
   }, [])
 
+  // iOS 独立模式冷启动时，WebKit 可能先用偏矮的视口布局、底部露出黑边；
+  // 趁启动页幕布仍盖着屏幕时，对全高外壳做 display 翻转 + 同步重排，
+  // 强制 WebKit 重算视口到真实全屏（社区验证过的修法，启动页不透明，翻转不可见）。
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia('(display-mode: standalone)').matches) {
+      return
+    }
+    const heal = () => {
+      const shell = document.querySelector<HTMLElement>('.app-shell')
+      if (!shell) return
+      const prev = shell.style.display
+      shell.style.display = 'none'
+      void shell.offsetHeight // 同步重排，触发 WebKit 重新计算视口
+      shell.style.display = prev
+    }
+    const t1 = window.setTimeout(heal, 80)
+    const t2 = window.setTimeout(heal, 500)
+    return () => {
+      window.clearTimeout(t1)
+      window.clearTimeout(t2)
+    }
+  }, [])
+
   return (
     <>
       {!splashDone && <Splash onDone={() => setSplashDone(true)} />}
