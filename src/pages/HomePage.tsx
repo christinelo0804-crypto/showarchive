@@ -8,23 +8,32 @@ import { EmptyState, PageHeader } from '../components/ui'
 import { PosterCard } from '../components/PosterCard'
 import type { Show } from '../types'
 
+// 瀑布流渐显动画本次会话只播一次（首个可见卡片触发后置位）
+let revealedOnce = false
+
 function Reveal({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement | null>(null)
+  const [visible, setVisible] = useState(revealedOnce)
 
   useEffect(() => {
     const el = ref.current
     if (!el) return
+    if (revealedOnce) {
+      setVisible(true)
+      return
+    }
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (reduced || typeof IntersectionObserver === 'undefined') {
-      el.classList.add('poster-reveal-visible')
+      setVisible(true)
       return
     }
     const io = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting) {
-            entry.target.classList.add('poster-reveal-visible')
+            setVisible(true)
             io.unobserve(entry.target)
+            revealedOnce = true
           }
         }
       },
@@ -35,7 +44,7 @@ function Reveal({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <div ref={ref} className="poster-reveal">
+    <div ref={ref} className={`poster-reveal${visible ? ' poster-reveal-visible' : ''}`}>
       {children}
     </div>
   )
