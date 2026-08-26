@@ -38,6 +38,7 @@ jobs:
       - name: Build
         run: pnpm build
         env:
+          # GitHub Pages 项目页位于 /<仓库名>/ 子路径
           BASE_PATH: /${{ github.event.repository.name }}
 
       - name: SPA fallback（子路由直接刷新时回退到应用入口）
