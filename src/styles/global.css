@@ -59,9 +59,10 @@ a {
   margin: 0 auto;
   width: 100%;
   padding:
-    calc(22px + env(safe-area-inset-top))
+    calc(12px + env(safe-area-inset-top))
     20px
-    32px;
+    /* 底部留出导航胶囊 + 间隙，内容可滚到导航栏上方不被遮挡 */
+    calc(var(--nav-capsule) + var(--nav-gap) + 16px);
 }
 
 .page-header {
@@ -2351,7 +2352,6 @@ td.pivot-lv {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 32px;
   overflow: hidden;
   background: #170a0c;
 }
@@ -2360,6 +2360,7 @@ td.pivot-lv {
 .splash-curtain-right {
   position: absolute;
   top: 0;
+  bottom: 0;
   height: 100%;
   width: 50%;
   z-index: 2;
@@ -2449,6 +2450,7 @@ td.pivot-lv {
   align-items: center;
   justify-content: center;
   max-width: 420px;
+  padding: 0 32px;
   transition:
     opacity 0.45s ease,
     transform 0.45s ease,
