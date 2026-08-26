@@ -59,7 +59,7 @@ a {
   margin: 0 auto;
   width: 100%;
   padding:
-    calc(12px + env(safe-area-inset-top))
+    calc(8px + env(safe-area-inset-top))
     20px
     /* 底部留出导航胶囊 + 间隙，内容可滚到导航栏上方不被遮挡 */
     calc(var(--nav-capsule) + var(--nav-gap) + 16px);
