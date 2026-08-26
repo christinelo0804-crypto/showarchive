@@ -11,6 +11,14 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="description" content="ShowArchive — 个人观演记忆档案馆" />
     <title>ShowArchive</title>
+    <style>
+      /* 独立模式下加载占位层也用 vh，保证冷启动第一帧即为全屏高度 */
+      @media (display-mode: standalone) {
+        #root > div {
+          min-height: 100vh !important;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="root">
