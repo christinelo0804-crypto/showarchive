@@ -8,6 +8,11 @@ body {
   padding: 0;
 }
 
+html {
+  /* iOS 状态栏/灵动岛区域显示 html 背景，必须与主题背景一致 */
+  background: var(--color-bg-1);
+}
+
 body {
   background: var(--color-bg-1);
   color: var(--color-text-0);
@@ -163,20 +168,20 @@ a {
 /* ---------- 底部导航 ---------- */
 
 .bottom-nav {
-  position: relative;
-  flex-shrink: 0;
+  position: fixed;
+  left: 50%;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
   z-index: 50;
   width: min(calc(100% - var(--space-4)), 560px);
-  margin: 0 auto;
-  margin-bottom: max(12px, env(safe-area-inset-bottom));
   display: flex;
   align-items: stretch;
   justify-content: space-around;
   padding: var(--space-2) var(--space-3);
   background: var(--color-nav-bg);
-  border: 1px solid var(--color-line);
   border-radius: 28px;
-  box-shadow: var(--shadow-glass);
+  /* 无描边：轻微外阴影勾勒胶囊轮廓 */
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(20px) saturate(1.3);
   -webkit-backdrop-filter: blur(20px) saturate(1.3);
 }
@@ -1353,8 +1358,13 @@ a {
 }
 
 .form-actions {
-  position: sticky;
-  bottom: calc(var(--nav-height) + var(--space-3) + env(safe-area-inset-bottom));
+  /* 与导航栏一样固定定位：不随滚动容器移动，始终停在胶囊上方 24px */
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--nav-capsule) + var(--nav-gap) + 24px);
+  transform: translateX(-50%);
+  z-index: 45;
+  width: min(calc(100% - 40px), 1080px);
   display: flex;
   gap: var(--space-3);
   justify-content: flex-end;
@@ -1382,11 +1392,6 @@ a {
   width: 100%;
   max-height: 260px;
   object-fit: cover;
-}
-
-.upload-zone-small {
-  min-height: 86px;
-  border-style: dashed;
 }
 
 .note-image-grid {
@@ -2081,16 +2086,19 @@ td.pivot-lv {
 @keyframes fade-up {
   from {
     opacity: 0;
-    transform: translateY(8px);
   }
   to {
     opacity: 1;
-    transform: none;
   }
 }
 
 .page {
   animation: fade-up 0.3s ease;
+}
+
+/* 表单页：底部内边距让最后内容能滚到固定按钮上方，不被按钮遮住 */
+.app-main:has(.form-page) {
+  padding-bottom: calc(var(--nav-capsule) + var(--nav-gap) + 24px + 76px);
 }
 
 .category-group {
@@ -2352,23 +2360,24 @@ td.pivot-lv {
 .splash-curtain-right {
   position: absolute;
   top: 0;
-  bottom: 0;
+  height: 100%;
   width: 50%;
   z-index: 2;
   overflow: hidden;
   pointer-events: none;
-  background-size: cover;
-  background-repeat: no-repeat;
+  object-fit: cover;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .splash-curtain-left {
   left: 0;
-  background-position: left center;
+  object-position: left center;
 }
 
 .splash-curtain-right {
   right: 0;
-  background-position: right center;
+  object-position: right center;
 }
 
 .splash.opening .splash-curtain-left {

@@ -52,6 +52,10 @@
 
   --shadow-glass: 0 14px 44px rgba(0, 0, 0, 0.5);
   --nav-height: 78px;
+  /* 导航胶囊下沿到屏幕底的间隙（含安全区） */
+  --nav-gap: max(12px, env(safe-area-inset-bottom));
+  /* 导航胶囊自身高度 */
+  --nav-capsule: 66px;
 
   --space-1: 4px;
   --space-2: 8px;
