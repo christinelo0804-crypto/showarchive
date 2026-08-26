@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import { PageHeader, SectionTitle } from '../components/ui'
+import { applyTheme } from '../lib/theme'
 
 export default function SettingsPage() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() =>
@@ -9,7 +10,7 @@ export default function SettingsPage() {
 
   function pickTheme(next: 'dark' | 'light') {
     setTheme(next)
-    document.documentElement.dataset.theme = next
+    applyTheme(next)
     try {
       localStorage.setItem('showarchive-theme', next)
     } catch {
