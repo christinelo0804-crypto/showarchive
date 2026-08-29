@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import { activeShows } from '../db/repositories'
 import { Chart } from '../components/Chart'
+import { Select } from '../components/Select'
 import { EmptyState, PageHeader, SectionTitle } from '../components/ui'
 import {
   computeOverview,
@@ -87,15 +88,34 @@ export default function StatsPage() {
   const [granularity, setGranularity] = useState<TimeGranularity>('month')
   const [measure, setMeasure] = useState<PivotMeasure>('count')
   const [chartKind, setChartKind] = useState<ChartKind>('bar')
+  const [overviewYear, setOverviewYear] = useState('all')
+  const [pivotYear, setPivotYear] = useState('all')
 
   const all = shows ?? []
+  const yearOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const s of all) {
+      const y = s.date.slice(0, 4)
+      if (y) set.add(y)
+    }
+    const years = [...set].sort((a, b) => (a < b ? 1 : a > b ? -1 : 0))
+    return [{ value: 'all', label: '全部年份' }, ...years.map((y) => ({ value: y, label: y }))]
+  }, [all])
+  const overviewShows = useMemo(
+    () => (overviewYear === 'all' ? all : all.filter((s) => s.date.slice(0, 4) === overviewYear)),
+    [all, overviewYear]
+  )
+  const pivotShows = useMemo(
+    () => (pivotYear === 'all' ? all : all.filter((s) => s.date.slice(0, 4) === pivotYear)),
+    [all, pivotYear]
+  )
   const stats = useMemo(
-    () => computeOverview(all),
-    [all]
+    () => computeOverview(overviewShows),
+    [overviewShows]
   )
   const pivot = useMemo(
-    () => computePivot(all, categories ?? [], cities ?? [], venues ?? [], dims, granularity, measure),
-    [all, categories, cities, venues, dims, granularity, measure]
+    () => computePivot(pivotShows, categories ?? [], cities ?? [], venues ?? [], dims, granularity, measure),
+    [pivotShows, categories, cities, venues, dims, granularity, measure]
   )
   const rows = useMemo(() => flattenPivot(pivot, dims.length), [pivot, dims.length])
 
@@ -255,7 +275,19 @@ export default function StatsPage() {
       ) : (
         <>
           <section className="form-section">
-            <SectionTitle kicker="Overview">概览</SectionTitle>
+            <SectionTitle
+              kicker="Overview"
+              action={
+                <Select
+                  value={overviewYear}
+                  onChange={setOverviewYear}
+                  options={yearOptions}
+                  ariaLabel="概览年度筛选"
+                />
+              }
+            >
+              概览
+            </SectionTitle>
             <div className="stat-grid">
               <div className="stat-card">
                 <p className="stat-number">{stats.total}</p>
@@ -285,7 +317,19 @@ export default function StatsPage() {
           </section>
 
           <section className="form-section">
-            <SectionTitle kicker="Pivot">透视分析</SectionTitle>
+            <SectionTitle
+              kicker="Pivot"
+              action={
+                <Select
+                  value={pivotYear}
+                  onChange={setPivotYear}
+                  options={yearOptions}
+                  ariaLabel="透视分析年度筛选"
+                />
+              }
+            >
+              透视分析
+            </SectionTitle>
 
             <div className="pivot-controls">
               <div className="pivot-field">
@@ -391,7 +435,10 @@ export default function StatsPage() {
                     <div className="pivot-chart">
                       <div className="pivot-chart-head">
                         <span className="pivot-chart-title">{chartTitle}</span>
-                        {dims.length === 2 && <span className="pivot-chart-note">次级维度 Top {STACK_MAX}</span>}
+                        <span className="pivot-chart-notes">
+                          {pivotYear !== 'all' && <span className="pivot-chart-note">{pivotYear} 年</span>}
+                          {dims.length === 2 && <span className="pivot-chart-note">次级维度 Top {STACK_MAX}</span>}
+                        </span>
                       </div>
                       <Chart option={chartOption} height={280} />
                     </div>
