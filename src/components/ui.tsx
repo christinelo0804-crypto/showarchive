@@ -46,11 +46,22 @@ export function PageHeader({
   )
 }
 
-export function SectionTitle({ children, kicker }: { children: ReactNode; kicker?: string }) {
+export function SectionTitle({
+  children,
+  kicker,
+  action
+}: {
+  children: ReactNode
+  kicker?: string
+  action?: ReactNode
+}) {
   return (
     <div>
       {kicker && <p className="section-kicker">{kicker}</p>}
-      <h2 className="section-title">{children}</h2>
+      <h2 className="section-title">
+        {children}
+        {action && <span className="section-title-action">{action}</span>}
+      </h2>
     </div>
   )
 }

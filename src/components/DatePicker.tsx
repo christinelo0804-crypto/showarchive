@@ -17,6 +17,13 @@ function calendarCells(year: number, month: number): Array<string | null> {
   return cells
 }
 
+/** 年份选择范围：当前年份往前 50 年、往后 2 年，从新到旧排列。 */
+function yearOptions(currentYear: number): number[] {
+  const years: number[] = []
+  for (let y = currentYear + 2; y >= currentYear - 50; y--) years.push(y)
+  return years
+}
+
 export function DatePicker({
   value,
   onChange,
@@ -30,6 +37,7 @@ export function DatePicker({
 }) {
   const now = new Date()
   const [open, setOpen] = useState(false)
+  const [yearOpen, setYearOpen] = useState(false)
   const [year, setYear] = useState(() => {
     const d = value ? new Date(value) : now
     return Number.isNaN(d.getTime()) ? now.getFullYear() : d.getFullYear()
@@ -43,10 +51,16 @@ export function DatePicker({
   useEffect(() => {
     if (!open) return
     const onDocClick = (e: globalThis.MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setYearOpen(false)
+      }
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
+      if (e.key === 'Escape') {
+        setOpen(false)
+        setYearOpen(false)
+      }
     }
     document.addEventListener('mousedown', onDocClick)
     document.addEventListener('keydown', onKey)
@@ -60,6 +74,7 @@ export function DatePicker({
   const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
 
   function changeMonth(delta: number) {
+    setYearOpen(false)
     const next = new Date(year, month + delta, 1)
     setYear(next.getFullYear())
     setMonth(next.getMonth())
@@ -85,8 +100,51 @@ export function DatePicker({
         <div className="picker-pop picker-cal" role="dialog" aria-label="选择日期">
           <div className="picker-cal-head">
             <span className="picker-cal-title">
-              {year} 年 {month + 1} 月
+              <span className="picker-cal-year-wrap">
+                <button
+                  type="button"
+                  className="picker-cal-year"
+                  onClick={() => setYearOpen((o) => !o)}
+                  aria-haspopup="listbox"
+                  aria-expanded={yearOpen}
+                >
+                  {year} <span className="picker-cal-year-chev">▾</span>
+                </button>
+                {yearOpen && (
+                  <span className="picker-cal-year-menu" role="listbox">
+                    {yearOptions(now.getFullYear()).map((y) => (
+                      <button
+                        key={y}
+                        type="button"
+                        role="option"
+                        aria-selected={y === year}
+                        className={`picker-cal-year-opt ${y === year ? 'on' : ''}`}
+                        onClick={() => {
+                          setYear(y)
+                          setYearOpen(false)
+                        }}
+                      >
+                        {y}
+                      </button>
+                    ))}
+                  </span>
+                )}
+              </span>
+              年 {month + 1} 月
             </span>
+            {year !== now.getFullYear() && (
+              <button
+                type="button"
+                className="picker-cal-today"
+                onClick={() => {
+                  setYear(now.getFullYear())
+                  setMonth(now.getMonth())
+                  setYearOpen(false)
+                }}
+              >
+                回到今年
+              </button>
+            )}
             <div className="picker-cal-nav">
               <button type="button" className="picker-nav-btn" onClick={() => changeMonth(-1)} aria-label="上个月">
                 ‹

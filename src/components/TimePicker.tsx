@@ -16,10 +16,10 @@ export function TimePicker({
   id?: string
 }) {
   const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState<[string, string]>(['00', '00'])
   const rootRef = useRef<HTMLDivElement | null>(null)
   const hoursRef = useRef<HTMLDivElement | null>(null)
   const minutesRef = useRef<HTMLDivElement | null>(null)
-  const [hour, minute] = value ? value.split(':') : ['', '']
 
   useEffect(() => {
     if (!open) return
@@ -48,11 +48,16 @@ export function TimePicker({
   }, [open])
 
   function selectHour(h: string) {
-    onChange(`${h}:${minute || '00'}`)
+    setDraft([h, draft[1]])
   }
 
   function selectMinute(m: string) {
-    onChange(`${hour || '00'}:${m}`)
+    setDraft([draft[0], m])
+  }
+
+  function confirm() {
+    onChange(`${draft[0]}:${draft[1]}`)
+    setOpen(false)
   }
 
   return (
@@ -61,7 +66,13 @@ export function TimePicker({
         type="button"
         id={id}
         className="select-trigger"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (!open) {
+            const [h, m] = value ? value.split(':') : ['00', '00']
+            setDraft([h, m])
+          }
+          setOpen((o) => !o)
+        }}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={ariaLabel}
@@ -81,8 +92,8 @@ export function TimePicker({
                   <button
                     key={h}
                     type="button"
-                    data-selected={h === hour}
-                    className={`picker-time-row ${h === hour ? 'picker-time-selected' : ''}`}
+                    data-selected={h === draft[0]}
+                    className={`picker-time-row ${h === draft[0] ? 'picker-time-selected' : ''}`}
                     onClick={() => selectHour(h)}
                   >
                     {h}
@@ -97,8 +108,8 @@ export function TimePicker({
                   <button
                     key={m}
                     type="button"
-                    data-selected={m === minute}
-                    className={`picker-time-row ${m === minute ? 'picker-time-selected' : ''}`}
+                    data-selected={m === draft[1]}
+                    className={`picker-time-row ${m === draft[1] ? 'picker-time-selected' : ''}`}
                     onClick={() => selectMinute(m)}
                   >
                     {m}
@@ -106,6 +117,11 @@ export function TimePicker({
                 ))}
               </div>
             </div>
+          </div>
+          <div className="picker-time-foot">
+            <button type="button" className="picker-time-confirm" onClick={confirm}>
+              确定
+            </button>
           </div>
         </div>
       )}
