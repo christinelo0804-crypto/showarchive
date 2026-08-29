@@ -154,6 +154,38 @@ a {
   flex: 1;
   height: 1px;
   background: var(--color-line);
+  order: 1;
+}
+
+/* 区块标题右侧的操作区（如筛选器） */
+.section-title-action {
+  flex-shrink: 0;
+  order: 2;
+  display: flex;
+  align-items: center;
+}
+
+/* 区块标题内的紧凑下拉：年份有限，不需要滚动条 */
+.section-title-action .select-wrap {
+  width: auto;
+  min-width: 104px;
+}
+
+.section-title-action .select-trigger {
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: var(--fs-sm);
+}
+
+.section-title-action .select-pop {
+  max-height: none;
+  overflow-y: visible;
+  padding: 4px;
+}
+
+.section-title-action .select-option {
+  padding: 7px 10px;
+  font-size: var(--fs-sm);
 }
 
 .section-kicker {
@@ -1132,6 +1164,86 @@ a {
 .picker-cal-title {
   font-family: var(--font-display);
   font-size: var(--fs-md);
+  white-space: nowrap;
+}
+
+/* 日历标题中的年份可点选 */
+.picker-cal-year-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.picker-cal-year {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-amber-soft);
+  color: var(--color-amber);
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.picker-cal-year-chev {
+  font-size: 9px;
+  color: var(--color-kicker);
+}
+
+.picker-cal-year-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 75;
+  width: 120px;
+  max-height: 240px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 4px;
+  background: var(--color-pop);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-glass);
+}
+
+.picker-cal-year-menu::-webkit-scrollbar {
+  display: none;
+}
+
+.picker-cal-year-opt {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-1);
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.picker-cal-year-opt:hover {
+  background: var(--color-amber-soft);
+  color: var(--color-amber);
+}
+
+.picker-cal-year-opt.on {
+  color: var(--color-amber);
+  font-weight: 600;
+}
+
+.picker-cal-today {
+  border: none;
+  background: transparent;
+  color: var(--color-amber);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  cursor: pointer;
 }
 
 .picker-cal-nav {
@@ -1246,6 +1358,24 @@ a {
   background: var(--color-amber);
   color: #15131f;
   font-weight: 700;
+}
+
+.picker-time-foot {
+  margin-top: 8px;
+}
+
+.picker-time-confirm {
+  display: block;
+  width: 100%;
+  min-height: 34px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--color-amber-grad-a), var(--color-amber-grad-b));
+  color: #15131f;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  cursor: pointer;
 }
 
 .select-pop {
@@ -1974,6 +2104,12 @@ a {
 .pivot-chart-note {
   font-size: var(--fs-xs);
   color: var(--color-text-2);
+}
+
+.pivot-chart-notes {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
 }
 
 .pivot-table-wrap {
