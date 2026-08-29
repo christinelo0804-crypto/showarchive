@@ -72,6 +72,40 @@ export const PIVOT_DIM_LABELS: Record<PivotDimKey, string> = {
   venue: '场馆'
 }
 
+function zeroNode(name: string): PivotNode {
+  return { name, count: 0, cost: 0, ratingSum: 0, ratingCount: 0, children: [] }
+}
+
+/** 时间作为主维度时，把缺失的年/月补成 0 值节点，保证时间轴连续。 */
+function fillTimeGaps(root: PivotNode, granularity: TimeGranularity): void {
+  if (root.children.length === 0) return
+  const names = root.children.map((c) => c.name)
+  const years = new Set<number>()
+  for (const n of names) {
+    const y = Number(n.slice(0, 4))
+    if (!Number.isNaN(y)) years.add(y)
+  }
+  if (years.size === 0) return
+  const minYear = Math.min(...years)
+  const maxYear = Math.max(...years)
+  const seen = new Set(names)
+  if (granularity === 'year') {
+    // 年粒度：从有演出的最早年份开始，逐年补全到最近年份
+    for (let y = minYear; y <= maxYear; y++) {
+      const key = String(y)
+      if (!seen.has(key)) root.children.push(zeroNode(key))
+    }
+    return
+  }
+  // 月粒度：从有演出的最早年份的 1 月起，到最近年份的 12 月止，每年 12 个月全部展示
+  for (let y = minYear; y <= maxYear; y++) {
+    for (let m = 1; m <= 12; m++) {
+      const key = `${y}-${String(m).padStart(2, '0')}`
+      if (!seen.has(key)) root.children.push(zeroNode(key))
+    }
+  }
+}
+
 /** 按选中的维度组合做树形聚合；非时间维度按度量降序，时间维度按时间升序。 */
 export function computePivot(
   shows: Show[],
@@ -104,16 +138,19 @@ export function computePivot(
       if (!child) {
         child = { name, count: 0, cost: 0, ratingSum: 0, ratingCount: 0, children: [] }
         node.children.push(child)
-      }
-      node = child
     }
-    node.count++
-    node.cost += s.paidPrice ?? 0
-    if (s.rating != null) {
-      node.ratingSum += s.rating
-      node.ratingCount++
-    }
+    node = child
   }
+  node.count++
+  node.cost += s.paidPrice ?? 0
+  if (s.rating != null) {
+    node.ratingSum += s.rating
+    node.ratingCount++
+  }
+  }
+
+  // 时间作为主维度（图表 X 轴）时补全缺失的年/月，无数据的时间点以 0 展示
+  if (dims[0] === 'time') fillTimeGaps(root, granularity)
 
   const sortLevel = (node: PivotNode, depth: number) => {
     const isTime = dims[depth] === 'time'
