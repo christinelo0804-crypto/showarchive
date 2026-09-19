@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
+import { useCachedLiveQuery } from '../lib/liveCache'
 import {
   addCategory,
   deleteCategory,
@@ -21,8 +21,8 @@ function compareCategory(a: Category, b: Category): number {
 
 export default function CategoryManagePage() {
   const toast = useToast()
-  const categories = useLiveQuery(() => listCategories(), [])
-  const shows = useLiveQuery(() => db.shows.toArray(), [])
+  const categories = useCachedLiveQuery('categories:list', () => listCategories())
+  const shows = useCachedLiveQuery('shows:all', () => db.shows.toArray())
 
   const [name, setName] = useState('')
   const [parentId, setParentId] = useState('')

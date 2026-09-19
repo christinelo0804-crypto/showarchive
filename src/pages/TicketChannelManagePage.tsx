@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
+import { useCachedLiveQuery } from '../lib/liveCache'
 import {
   deleteTicketChannel,
   ensureTicketChannel,
@@ -15,8 +15,8 @@ import type { TicketChannel } from '../types'
 
 export default function TicketChannelManagePage() {
   const toast = useToast()
-  const channels = useLiveQuery(() => db.ticketChannels.toArray(), [])
-  const shows = useLiveQuery(() => db.shows.toArray(), [])
+  const channels = useCachedLiveQuery('ticket-channels', () => db.ticketChannels.toArray())
+  const shows = useCachedLiveQuery('shows:all', () => db.shows.toArray())
 
   const [name, setName] = useState('')
   const [query, setQuery] = useState('')

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useCachedLiveQuery } from '../lib/liveCache'
 import { Button, PageHeader, SectionTitle } from '../components/ui'
 import { Modal } from '../components/Modal'
 import { useToast } from '../components/Toast'
@@ -20,7 +20,7 @@ type ImportMode = 'merge' | 'replace'
 
 export default function DataManagePage() {
   const toast = useToast()
-  const overview = useLiveQuery(() => getDataOverview(), [])
+  const overview = useCachedLiveQuery('data:overview', () => getDataOverview())
   const fileRef = useRef<HTMLInputElement | null>(null)
 
   const [busy, setBusy] = useState(false)

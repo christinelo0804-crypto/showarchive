@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
+import { useCachedLiveQuery } from '../lib/liveCache'
 import {
   deleteCity,
   deleteVenue,
@@ -22,9 +22,9 @@ type Target = { kind: 'city'; item: City } | { kind: 'venue'; item: Venue }
 
 export default function CityVenueManagePage() {
   const toast = useToast()
-  const cities = useLiveQuery(() => db.cities.toArray(), [])
-  const venues = useLiveQuery(() => db.venues.toArray(), [])
-  const shows = useLiveQuery(() => db.shows.toArray(), [])
+  const cities = useCachedLiveQuery('cities', () => db.cities.toArray())
+  const venues = useCachedLiveQuery('venues', () => db.venues.toArray())
+  const shows = useCachedLiveQuery('shows:all', () => db.shows.toArray())
 
   const [tab, setTab] = useState<Tab>('city')
   const [query, setQuery] = useState('')

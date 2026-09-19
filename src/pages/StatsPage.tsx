@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import { activeShows } from '../db/repositories'
+import { useCachedLiveQuery } from '../lib/liveCache'
 import { Chart } from '../components/Chart'
 import { Select } from '../components/Select'
 import { EmptyState, PageHeader, SectionTitle } from '../components/ui'
@@ -79,10 +79,10 @@ export default function StatsPage() {
   const pieBorder = isLight ? '#f6f2e9' : '#1A1A2E'
   const otherColor = isLight ? 'rgba(46,40,28,0.18)' : 'rgba(236,230,220,0.24)'
 
-  const shows = useLiveQuery(() => activeShows(), [])
-  const categories = useLiveQuery(() => db.categories.toArray(), [])
-  const cities = useLiveQuery(() => db.cities.toArray(), [])
-  const venues = useLiveQuery(() => db.venues.toArray(), [])
+  const shows = useCachedLiveQuery('shows:active', () => activeShows())
+  const categories = useCachedLiveQuery('categories', () => db.categories.toArray())
+  const cities = useCachedLiveQuery('cities', () => db.cities.toArray())
+  const venues = useCachedLiveQuery('venues', () => db.venues.toArray())
 
   const [dims, setDims] = useState<PivotDimKey[]>(['time', 'cat1'])
   const [granularity, setGranularity] = useState<TimeGranularity>('month')
@@ -271,7 +271,11 @@ export default function StatsPage() {
       <PageHeader eyebrow="Statistics" title="统计" />
 
       {stats.total === 0 ? (
-        <EmptyState title="还没有记录" hint="新增第一条演出记录后，这里会出现统计与透视分析。" />
+        shows === undefined ? (
+          <p className="muted">读取中…</p>
+        ) : (
+          <EmptyState title="还没有记录" hint="新增第一条演出记录后，这里会出现统计与透视分析。" />
+        )
       ) : (
         <>
           <section className="form-section">

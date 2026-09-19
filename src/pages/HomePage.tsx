@@ -1,15 +1,20 @@
 import { Link } from 'react-router-dom'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import { activeShows } from '../db/repositories'
 import { EmptyState, PageHeader } from '../components/ui'
 import { PosterCard } from '../components/PosterCard'
+import { useCachedLiveQuery } from '../lib/liveCache'
+import { markScrollRestore } from '../lib/scrollRestore'
 import type { Show } from '../types'
 
 // 瀑布流渐显动画本次会话只播一次（首个可见卡片触发后置位）
 let revealedOnce = false
+// 首页滚动位置缓存：进入详情页再返回时恢复
+let homeScrollTop = 0
+// 滚动过程中持续记录最新位置，避免离开页面时读取时机被“回到顶部”覆盖成 0
+let homeLastScroll = 0
 
 function Reveal({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement | null>(null)
@@ -51,8 +56,8 @@ function Reveal({ children }: { children: ReactNode }) {
 }
 
 export default function HomePage() {
-  const shows = useLiveQuery(() => activeShows(), [])
-  const categories = useLiveQuery(() => db.categories.toArray(), [])
+  const shows = useCachedLiveQuery('shows:active', () => activeShows())
+  const categories = useCachedLiveQuery('categories', () => db.categories.toArray())
   const [wallStyle, setWallStyle] = useState<'grid' | 'masonry'>(() => {
     try {
       return localStorage.getItem('showarchive-wall') === 'masonry' ? 'masonry' : 'grid'
@@ -81,6 +86,73 @@ export default function HomePage() {
     [categories]
   )
   const categoryNameOf = (id?: string) => (id ? categoryNameMap.get(id) ?? '' : '')
+
+  // 监听滚动容器，持续记录首页滚动位置
+  useEffect(() => {
+    const main = document.querySelector<HTMLElement>('.app-main')
+    const onScroll = () => {
+      const mainTop = main ? main.scrollTop : 0
+      const winTop = window.scrollY || document.documentElement.scrollTop || 0
+      homeLastScroll = Math.max(mainTop, winTop)
+    }
+    main?.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      main?.removeEventListener('scroll', onScroll)
+      window.removeEventListener('scroll', onScroll)
+    }
+  }, [])
+
+  // 离开首页时记录滚动位置；只有进入演出详情页才缓存，切到其他页面则下次从顶部开始。
+  const mountPathRef = useRef(window.location.pathname)
+  useEffect(() => {
+    return () => {
+      const path = window.location.pathname
+      // React StrictMode 在开发环境会先模拟卸载再重新挂载，此时路径未变，跳过以免清空缓存
+      if (path === mountPathRef.current) return
+      if (/\/shows\/[^/]+$/.test(path)) {
+        homeScrollTop = homeLastScroll
+        console.log('[home-save]', { path, scrollTop: homeLastScroll })
+      } else {
+        homeScrollTop = 0
+      }
+    }
+  }, [])
+
+  // 返回后恢复滚动位置（数据加载完后的下一帧应用，避免被路由的置顶逻辑覆盖）
+  const scrollRestoredRef = useRef(false)
+  // 绘制前就把滚动位置放回去：避免「先看到顶部、再跳回原位」的闪动
+  useLayoutEffect(() => {
+    if (homeScrollTop <= 0) return
+    markScrollRestore()
+    const main = document.querySelector<HTMLElement>('.app-main')
+    if (main) main.scrollTop = homeScrollTop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(() => {
+    if (shows === undefined || scrollRestoredRef.current) return
+    scrollRestoredRef.current = true
+    if (homeScrollTop <= 0) return
+    let frames = 0
+    const apply = () => {
+      // 每帧重新查询滚动容器：页面切换时容器可能被重建
+      const main = document.querySelector<HTMLElement>('.app-main')
+      if (main) main.scrollTop = homeScrollTop
+      const actual = main ? main.scrollTop : window.scrollY
+      const maxScroll = main ? main.scrollHeight - main.clientHeight : -1
+      if (frames === 0) {
+        console.log('[home-restore] start', { saved: homeScrollTop, actual, maxScroll })
+      }
+      if (actual !== homeScrollTop && frames < 60) {
+        frames++
+        requestAnimationFrame(apply)
+        return
+      }
+      console.log('[home-restore] done', { saved: homeScrollTop, actual, frames, maxScroll })
+    }
+    requestAnimationFrame(apply)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shows])
 
   function switchWall(next: 'grid' | 'masonry') {
     setWallStyle(next)

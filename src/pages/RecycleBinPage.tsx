@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useCachedLiveQuery } from '../lib/liveCache'
 import { emptyTrash, purgeShow, restoreShow, trashedShows } from '../db/repositories'
 import { Button, EmptyState, PageHeader } from '../components/ui'
 import { formatDateWithYear } from '../lib/format'
@@ -8,7 +8,7 @@ import { useToast } from '../components/Toast'
 
 export default function RecycleBinPage() {
   const toast = useToast()
-  const trashed = useLiveQuery(() => trashedShows(), [])
+  const trashed = useCachedLiveQuery('shows:trashed', () => trashedShows())
   const [confirmAction, setConfirmAction] = useState<{ type: 'empty' } | { type: 'purge'; id: string } | null>(null)
   const [busy, setBusy] = useState(false)
 

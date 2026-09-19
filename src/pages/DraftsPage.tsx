@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
+import { useCachedLiveQuery } from '../lib/liveCache'
 import { draftShows, softDeleteShow } from '../db/repositories'
 import { Button, EmptyState, PageHeader } from '../components/ui'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -10,9 +10,9 @@ import { formatDateWithYear } from '../lib/format'
 
 export default function DraftsPage() {
   const toast = useToast()
-  const drafts = useLiveQuery(() => draftShows(), [])
-  const cities = useLiveQuery(() => db.cities.toArray(), [])
-  const venues = useLiveQuery(() => db.venues.toArray(), [])
+  const drafts = useCachedLiveQuery('shows:drafts', () => draftShows())
+  const cities = useCachedLiveQuery('cities', () => db.cities.toArray())
+  const venues = useCachedLiveQuery('venues', () => db.venues.toArray())
   const [pendingDelete, setPendingDelete] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const cityNameMap = useMemo(() => new Map((cities ?? []).map((c) => [c.id, c.name])), [cities])

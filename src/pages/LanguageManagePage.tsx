@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
+import { useCachedLiveQuery } from '../lib/liveCache'
 import {
   deleteLanguage,
   ensureLanguage,
@@ -15,8 +15,8 @@ import type { Language } from '../types'
 
 export default function LanguageManagePage() {
   const toast = useToast()
-  const languages = useLiveQuery(() => db.languages.toArray(), [])
-  const shows = useLiveQuery(() => db.shows.toArray(), [])
+  const languages = useCachedLiveQuery('languages', () => db.languages.toArray())
+  const shows = useCachedLiveQuery('shows:all', () => db.shows.toArray())
 
   const [name, setName] = useState('')
   const [query, setQuery] = useState('')
