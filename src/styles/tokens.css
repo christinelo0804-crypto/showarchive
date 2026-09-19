@@ -51,6 +51,8 @@
   --fs-2xl: 2rem;
 
   --shadow-glass: 0 14px 44px rgba(0, 0, 0, 0.5);
+  /* 底部导航胶囊：深色下黑色阴影几乎不可见，改用双层阴影撑出轮廓 */
+  --shadow-nav: 0 2px 6px rgba(0, 0, 0, 0.45), 0 14px 32px rgba(0, 0, 0, 0.4);
   --nav-height: 78px;
   /* 导航胶囊下沿到屏幕底的间隙（含安全区） */
   --nav-gap: max(12px, env(safe-area-inset-bottom));
@@ -101,4 +103,6 @@
   --glow-rose: rgba(190, 126, 114, 0.07);
   --glow-amber: rgba(176, 122, 53, 0.07);
   --shadow-glass: 0 14px 44px rgba(82, 68, 47, 0.18);
+  /* 浅色下黑阴影本来就可见，保持原值不变 */
+  --shadow-nav: 0 8px 28px rgba(0, 0, 0, 0.28);
 }
