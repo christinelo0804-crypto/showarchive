@@ -7,7 +7,7 @@ import { Timeline } from '../components/Timeline'
 import { ImagePreview } from '../components/ImagePreview'
 import { useToast } from '../components/Toast'
 import { useCachedLiveQuery } from '../lib/liveCache'
-import { previousPathname, restoreScrollPosition } from '../lib/scrollRestore'
+import { previousRoutePathname, restoreScrollPosition } from '../lib/scrollRestore'
 import { coverColors, coverSize } from '../lib/posterCover'
 import { formatDateWithYear } from '../lib/format'
 import type { Category, Show, Venue } from '../types'
@@ -81,7 +81,9 @@ let showsScrollTop = 0
 
 export default function ShowsPage() {
   const { push } = useToast()
-  const cached = showsBrowseCache
+  // 只有「从演出详情页返回」才恢复上次的浏览状态；从其他标签进入则从默认开始
+  const fromDetail = /\/shows\/[^/]+$/.test(previousRoutePathname())
+  const cached = fromDetail ? showsBrowseCache : null
   const [view, setView] = useState<ViewMode>(cached?.view ?? 'list')
   const [query, setQuery] = useState(cached?.query ?? '')
   const [statuses, setStatuses] = useState<string[]>(cached?.statuses ?? [])
@@ -145,6 +147,8 @@ export default function ShowsPage() {
       const mainTop = main ? main.scrollTop : 0
       const winTop = window.scrollY || document.documentElement.scrollTop || 0
       showsScrollTop = Math.max(mainTop, winTop)
+      // 滚动位置同步写入缓存（不依赖卸载时机）
+      if (showsBrowseCache) showsBrowseCache = { ...showsBrowseCache, scrollTop: showsScrollTop }
     }
     main?.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('scroll', onScroll, { passive: true })
@@ -154,21 +158,10 @@ export default function ShowsPage() {
     }
   }, [])
 
-  // 离开本页时保存浏览状态；只有进入演出详情页才缓存，切到其他页面则下次从默认开始。
-  const mountPathRef = useRef(window.location.pathname)
+  // 持续保存浏览状态：状态一变化就写入模块缓存（不依赖页面卸载时机，真机上更可靠）
   useEffect(() => {
-    return () => {
-      const path = window.location.pathname
-      // React StrictMode 在开发环境会先模拟卸载再重新挂载，此时路径未变，跳过以免清空缓存
-      if (path === mountPathRef.current) return
-      if (/\/shows\/[^/]+$/.test(path)) {
-        showsBrowseCache = { ...stateRef.current, scrollTop: showsScrollTop }
-        push('info', `诊断·已记录 ${Math.round(showsScrollTop)}`)
-      } else {
-        showsBrowseCache = null
-      }
-    }
-  }, [])
+    showsBrowseCache = { ...stateRef.current, scrollTop: showsScrollTop }
+  })
 
   // 从详情页返回时恢复滚动位置：绘制前先放回，并在随后约 1.6 秒内守住
   // （iOS 的滚动恢复可能稍后才把容器重置为 0；用户主动滚动后立即停止干预）
@@ -182,7 +175,7 @@ export default function ShowsPage() {
       const actual = main ? Math.round(main.scrollTop) : -1
       const target = cached ? Math.round(savedScrollTop) : null
       setDiag(
-        `上一页 ${previousPathname() || '无'}｜记录 ${target ?? '无'}｜实际 ${actual}`
+        `上一页 ${previousRoutePathname() || '无'}｜记录 ${target ?? '无'}｜实际 ${actual}`
       )
       push(target == null ? 'error' : 'info', `诊断：记录 ${target ?? '无'} → 实际 ${actual}`)
     }, 700)

@@ -7,15 +7,13 @@ import { EmptyState, PageHeader } from '../components/ui'
 import { PosterCard } from '../components/PosterCard'
 import { useToast } from '../components/Toast'
 import { useCachedLiveQuery } from '../lib/liveCache'
-import { previousPathname, restoreScrollPosition } from '../lib/scrollRestore'
+import { previousRoutePathname, restoreScrollPosition } from '../lib/scrollRestore'
 import type { Show } from '../types'
 
 // 瀑布流渐显动画本次会话只播一次（首个可见卡片触发后置位）
 let revealedOnce = false
 // 首页滚动位置缓存：进入详情页再返回时恢复
 let homeScrollTop = 0
-// 滚动过程中持续记录最新位置，避免离开页面时读取时机被“回到顶部”覆盖成 0
-let homeLastScroll = 0
 
 function Reveal({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement | null>(null)
@@ -58,6 +56,7 @@ function Reveal({ children }: { children: ReactNode }) {
 
 export default function HomePage() {
   const { push } = useToast()
+  const fromDetail = /\/shows\/[^/]+$/.test(previousRoutePathname())
   const shows = useCachedLiveQuery('shows:active', () => activeShows())
   const categories = useCachedLiveQuery('categories', () => db.categories.toArray())
   const [wallStyle, setWallStyle] = useState<'grid' | 'masonry'>(() => {
@@ -96,7 +95,8 @@ export default function HomePage() {
     const onScroll = () => {
       const mainTop = main ? main.scrollTop : 0
       const winTop = window.scrollY || document.documentElement.scrollTop || 0
-      homeLastScroll = Math.max(mainTop, winTop)
+      // 持续记录，不依赖页面卸载时机
+      homeScrollTop = Math.max(mainTop, winTop)
     }
     main?.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('scroll', onScroll, { passive: true })
@@ -106,24 +106,9 @@ export default function HomePage() {
     }
   }, [])
 
-  // 离开首页时记录滚动位置；只有进入演出详情页才缓存，切到其他页面则下次从顶部开始。
-  const mountPathRef = useRef(window.location.pathname)
-  useEffect(() => {
-    return () => {
-      const path = window.location.pathname
-      // React StrictMode 在开发环境会先模拟卸载再重新挂载，此时路径未变，跳过以免清空缓存
-      if (path === mountPathRef.current) return
-      if (/\/shows\/[^/]+$/.test(path)) {
-        homeScrollTop = homeLastScroll
-        push('info', `诊断·已记录 ${Math.round(homeLastScroll)}`)
-      } else {
-        homeScrollTop = 0
-      }
-    }
-  }, [])
-
   // 从详情页返回时恢复滚动位置：绘制前先放回，并在随后约 1.6 秒内守住
-  useLayoutEffect(() => restoreScrollPosition(homeScrollTop), [])
+  const restoredScrollTop = fromDetail ? homeScrollTop : 0
+  useLayoutEffect(() => restoreScrollPosition(restoredScrollTop), [])
 
   // 临时诊断（真机定位用，定位后移除）：从详情页返回时显示记录的滚动值与实际值
   useEffect(() => {
@@ -132,7 +117,7 @@ export default function HomePage() {
       const actual = main ? Math.round(main.scrollTop) : -1
       const target = homeScrollTop > 0 ? Math.round(homeScrollTop) : null
       setDiag(
-        `上一页 ${previousPathname() || '无'}｜记录 ${target ?? '无'}｜实际 ${actual}`
+        `上一页 ${previousRoutePathname() || '无'}｜记录 ${target ?? '无'}｜实际 ${actual}`
       )
       push(target == null ? 'error' : 'info', `诊断：记录 ${target ?? '无'} → 实际 ${actual}`)
     }, 700)
