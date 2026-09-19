@@ -2303,6 +2303,20 @@ td.pivot-lv {
   }
 }
 
+/* 页面切换的轻过渡：从半透明淡入（不改布局、不用 transform，避免影响固定元素） */
+@keyframes page-in {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.page {
+  animation: page-in 0.16s ease-out;
+}
+
 /* 表单页：底部内边距让最后内容能滚到固定按钮上方，不被按钮遮住 */
 .app-main:has(.form-page) {
   padding-bottom: calc(var(--nav-capsule) + var(--nav-gap) + 24px + 76px);
