@@ -5,8 +5,9 @@ import { activeShows, draftShows } from '../db/repositories'
 import { Button, EmptyState, PageHeader } from '../components/ui'
 import { Timeline } from '../components/Timeline'
 import { ImagePreview } from '../components/ImagePreview'
+import { useToast } from '../components/Toast'
 import { useCachedLiveQuery } from '../lib/liveCache'
-import { markScrollRestore } from '../lib/scrollRestore'
+import { restoreScrollPosition } from '../lib/scrollRestore'
 import { coverColors, coverSize } from '../lib/posterCover'
 import { formatDateWithYear } from '../lib/format'
 import type { Category, Show, Venue } from '../types'
@@ -79,6 +80,7 @@ let showsBrowseCache: ShowsBrowseState | null = null
 let showsScrollTop = 0
 
 export default function ShowsPage() {
+  const { push } = useToast()
   const cached = showsBrowseCache
   const [view, setView] = useState<ViewMode>(cached?.view ?? 'list')
   const [query, setQuery] = useState(cached?.query ?? '')
@@ -160,48 +162,31 @@ export default function ShowsPage() {
       if (path === mountPathRef.current) return
       if (/\/shows\/[^/]+$/.test(path)) {
         showsBrowseCache = { ...stateRef.current, scrollTop: showsScrollTop }
-        console.log('[shows-save]', { path, scrollTop: showsScrollTop })
+        push('info', `诊断·已记录 ${Math.round(showsScrollTop)}`)
       } else {
         showsBrowseCache = null
       }
     }
   }, [])
 
-  // 返回后恢复列表滚动位置（等数据加载完、在下一帧应用，避免被路由的置顶逻辑覆盖）
+  // 从详情页返回时恢复滚动位置：绘制前先放回，并在随后约 1.6 秒内守住
+  // （iOS 的滚动恢复可能稍后才把容器重置为 0；用户主动滚动后立即停止干预）
   const savedScrollTop = cached?.scrollTop ?? 0
-  // 绘制前就把滚动位置放回去：避免「先看到顶部、再跳回原位」的闪动
-  useLayoutEffect(() => {
-    if (savedScrollTop <= 0) return
-    markScrollRestore()
-    const main = document.querySelector<HTMLElement>('.app-main')
-    if (main) main.scrollTop = savedScrollTop
+  useLayoutEffect(() => restoreScrollPosition(savedScrollTop), [])
+
+  // 临时诊断（真机定位用，定位后移除）：返回后位置不对时在屏幕上提示数值
+  useEffect(() => {
+    if (cached == null) return
+    const timer = window.setTimeout(() => {
+      const main = document.querySelector<HTMLElement>('.app-main')
+      const actual = main ? Math.round(main.scrollTop) : -1
+      if (actual !== Math.round(savedScrollTop)) {
+        push('error', `诊断：目标 ${Math.round(savedScrollTop)}，实际 ${actual}`)
+      }
+    }, 700)
+    return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  const restoredRef = useRef(false)
-  useEffect(() => {
-    if (shows === undefined || restoredRef.current) return
-    restoredRef.current = true
-    if (savedScrollTop <= 0) return
-    let frames = 0
-    const apply = () => {
-      // 每帧重新查询滚动容器：页面切换时容器可能被重建
-      const main = document.querySelector<HTMLElement>('.app-main')
-      if (main) main.scrollTop = savedScrollTop
-      const actual = main ? main.scrollTop : window.scrollY
-      const maxScroll = main ? main.scrollHeight - main.clientHeight : -1
-      if (frames === 0) {
-        console.log('[shows-restore] start', { saved: savedScrollTop, actual, maxScroll })
-      }
-      if (actual !== savedScrollTop && frames < 60) {
-        frames++
-        requestAnimationFrame(apply)
-        return
-      }
-      console.log('[shows-restore] done', { saved: savedScrollTop, actual, frames, maxScroll })
-    }
-    requestAnimationFrame(apply)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shows])
 
   const cityNameMap = useMemo(() => new Map((cities ?? []).map((c) => [c.id, c.name])), [cities])
   const venueNameMap = useMemo(() => new Map((venues ?? []).map((v) => [v.id, v.name])), [venues])

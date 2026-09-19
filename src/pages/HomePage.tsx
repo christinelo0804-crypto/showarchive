@@ -5,8 +5,9 @@ import { db } from '../db/db'
 import { activeShows } from '../db/repositories'
 import { EmptyState, PageHeader } from '../components/ui'
 import { PosterCard } from '../components/PosterCard'
+import { useToast } from '../components/Toast'
 import { useCachedLiveQuery } from '../lib/liveCache'
-import { markScrollRestore } from '../lib/scrollRestore'
+import { restoreScrollPosition } from '../lib/scrollRestore'
 import type { Show } from '../types'
 
 // 瀑布流渐显动画本次会话只播一次（首个可见卡片触发后置位）
@@ -56,6 +57,7 @@ function Reveal({ children }: { children: ReactNode }) {
 }
 
 export default function HomePage() {
+  const { push } = useToast()
   const shows = useCachedLiveQuery('shows:active', () => activeShows())
   const categories = useCachedLiveQuery('categories', () => db.categories.toArray())
   const [wallStyle, setWallStyle] = useState<'grid' | 'masonry'>(() => {
@@ -112,47 +114,29 @@ export default function HomePage() {
       if (path === mountPathRef.current) return
       if (/\/shows\/[^/]+$/.test(path)) {
         homeScrollTop = homeLastScroll
-        console.log('[home-save]', { path, scrollTop: homeLastScroll })
+        push('info', `诊断·已记录 ${Math.round(homeLastScroll)}`)
       } else {
         homeScrollTop = 0
       }
     }
   }, [])
 
-  // 返回后恢复滚动位置（数据加载完后的下一帧应用，避免被路由的置顶逻辑覆盖）
-  const scrollRestoredRef = useRef(false)
-  // 绘制前就把滚动位置放回去：避免「先看到顶部、再跳回原位」的闪动
-  useLayoutEffect(() => {
+  // 从详情页返回时恢复滚动位置：绘制前先放回，并在随后约 1.6 秒内守住
+  useLayoutEffect(() => restoreScrollPosition(homeScrollTop), [])
+
+  // 临时诊断（真机定位用，定位后移除）：返回后位置不对时在屏幕上提示数值
+  useEffect(() => {
     if (homeScrollTop <= 0) return
-    markScrollRestore()
-    const main = document.querySelector<HTMLElement>('.app-main')
-    if (main) main.scrollTop = homeScrollTop
+    const timer = window.setTimeout(() => {
+      const main = document.querySelector<HTMLElement>('.app-main')
+      const actual = main ? Math.round(main.scrollTop) : -1
+      if (actual !== Math.round(homeScrollTop)) {
+        push('error', `诊断：目标 ${Math.round(homeScrollTop)}，实际 ${actual}`)
+      }
+    }, 700)
+    return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  useEffect(() => {
-    if (shows === undefined || scrollRestoredRef.current) return
-    scrollRestoredRef.current = true
-    if (homeScrollTop <= 0) return
-    let frames = 0
-    const apply = () => {
-      // 每帧重新查询滚动容器：页面切换时容器可能被重建
-      const main = document.querySelector<HTMLElement>('.app-main')
-      if (main) main.scrollTop = homeScrollTop
-      const actual = main ? main.scrollTop : window.scrollY
-      const maxScroll = main ? main.scrollHeight - main.clientHeight : -1
-      if (frames === 0) {
-        console.log('[home-restore] start', { saved: homeScrollTop, actual, maxScroll })
-      }
-      if (actual !== homeScrollTop && frames < 60) {
-        frames++
-        requestAnimationFrame(apply)
-        return
-      }
-      console.log('[home-restore] done', { saved: homeScrollTop, actual, frames, maxScroll })
-    }
-    requestAnimationFrame(apply)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shows])
 
   function switchWall(next: 'grid' | 'masonry') {
     setWallStyle(next)
