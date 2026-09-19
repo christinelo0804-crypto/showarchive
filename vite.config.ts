@@ -8,6 +8,10 @@ const base = process.env.BASE_PATH || '/'
 
 export default defineConfig({
   base,
+  // 构建时间戳：设置页底部显示，便于确认设备上运行的是哪一版
+  define: {
+    __BUILD_ID__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' '))
+  },
   plugins: [
     react(),
     VitePWA({
