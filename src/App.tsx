@@ -7,7 +7,7 @@ import DefaultCategoryMigrationGate from './components/DefaultCategoryMigrationG
 import { Splash } from './components/Splash'
 import { seedIfEmpty } from './db/seed'
 import { applyTheme } from './lib/theme'
-import { consumeScrollRestore, recordPathname } from './lib/scrollRestore'
+import { recordPathname } from './lib/scrollRestore'
 import { preloadLiveCache } from './lib/liveCache'
 
 const routerBasename =
@@ -44,8 +44,6 @@ function ScrollToTop() {
   // 用 layout effect：在浏览器绘制前就处理滚动位置，
   // 避免先按上一页的位置画一帧、再跳到顶部（这是进入次级页面时闪动的来源）
   useLayoutEffect(() => {
-    // 目标页面会自行恢复滚动位置时（例如从详情页返回列表），跳过置顶
-    if (consumeScrollRestore()) return
     const main = document.querySelector<HTMLElement>('.app-main')
     if (main) main.scrollTop = 0
     else window.scrollTo(0, 0)
