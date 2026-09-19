@@ -74,6 +74,7 @@ interface ShowsBrowseState {
   month: number
   selectedDate: string | null
   scrollTop: number
+  savedAt: number
 }
 let showsBrowseCache: ShowsBrowseState | null = null
 // 滚动过程中持续记录最新位置，避免离开页面时读取时机被“回到顶部”覆盖成 0
@@ -81,9 +82,14 @@ let showsScrollTop = 0
 
 export default function ShowsPage() {
   const { push } = useToast()
-  // 只有「从演出详情页返回」才恢复上次的浏览状态；从其他标签进入则从默认开始
-  const fromDetail = /\/shows\/[^/]+$/.test(previousRoutePathname())
-  const cached = fromDetail ? showsBrowseCache : null
+  // 恢复上次浏览状态的判断：不依赖路由跟踪（真机上不可靠），
+  // 只排除「从新增/编辑表单返回」的情况，并要求记录足够新（5 分钟内）。
+  const prevRoute = previousRoutePathname()
+  const fromForm = /^\/(new|shows\/[^/]+\/edit)/.test(prevRoute)
+  const cacheFresh =
+    showsBrowseCache != null && Date.now() - showsBrowseCache.savedAt < 5 * 60 * 1000
+  const shouldRestore = !fromForm && cacheFresh
+  const cached = shouldRestore ? showsBrowseCache : null
   const [view, setView] = useState<ViewMode>(cached?.view ?? 'list')
   const [query, setQuery] = useState(cached?.query ?? '')
   const [statuses, setStatuses] = useState<string[]>(cached?.statuses ?? [])
@@ -148,7 +154,9 @@ export default function ShowsPage() {
       const winTop = window.scrollY || document.documentElement.scrollTop || 0
       showsScrollTop = Math.max(mainTop, winTop)
       // 滚动位置同步写入缓存（不依赖卸载时机）
-      if (showsBrowseCache) showsBrowseCache = { ...showsBrowseCache, scrollTop: showsScrollTop }
+      if (showsBrowseCache) {
+        showsBrowseCache = { ...showsBrowseCache, scrollTop: showsScrollTop, savedAt: Date.now() }
+      }
     }
     main?.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('scroll', onScroll, { passive: true })
@@ -160,7 +168,7 @@ export default function ShowsPage() {
 
   // 持续保存浏览状态：状态一变化就写入模块缓存（不依赖页面卸载时机，真机上更可靠）
   useEffect(() => {
-    showsBrowseCache = { ...stateRef.current, scrollTop: showsScrollTop }
+    showsBrowseCache = { ...stateRef.current, scrollTop: showsScrollTop, savedAt: Date.now() }
   })
 
   // 从详情页返回时恢复滚动位置：绘制前先放回，并在随后约 1.6 秒内守住
@@ -175,7 +183,9 @@ export default function ShowsPage() {
       const actual = main ? Math.round(main.scrollTop) : -1
       const target = cached ? Math.round(savedScrollTop) : null
       setDiag(
-        `上一页 ${previousRoutePathname() || '无'}｜记录 ${target ?? '无'}｜实际 ${actual}`
+        `上一页${prevRoute || '空'} 缓存${showsBrowseCache ? '有' : '无'} 记忆${Math.round(
+          showsScrollTop
+        )} 记录${target ?? '无'} 实际${actual} 恢复${shouldRestore ? '是' : '否'}`
       )
       push(target == null ? 'error' : 'info', `诊断：记录 ${target ?? '无'} → 实际 ${actual}`)
     }, 700)
