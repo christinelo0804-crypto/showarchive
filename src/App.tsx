@@ -7,6 +7,7 @@ import DefaultCategoryMigrationGate from './components/DefaultCategoryMigrationG
 import { Splash } from './components/Splash'
 import { seedIfEmpty } from './db/seed'
 import { applyTheme } from './lib/theme'
+import { consumeScrollRestore } from './lib/scrollRestore'
 
 const routerBasename =
   import.meta.env.BASE_URL === '/' ? '/' : import.meta.env.BASE_URL.replace(/\/+$/, '')
@@ -40,6 +41,8 @@ function Loading() {
 function ScrollToTop() {
   const { pathname } = useLocation()
   useEffect(() => {
+    // 目标页面会自行恢复滚动位置时（例如从详情页返回列表），跳过置顶
+    if (consumeScrollRestore()) return
     const main = document.querySelector<HTMLElement>('.app-main')
     if (main) main.scrollTop = 0
     else window.scrollTo(0, 0)
