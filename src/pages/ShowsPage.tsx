@@ -98,6 +98,7 @@ export default function ShowsPage() {
   const [month, setMonth] = useState(() => cached?.month ?? new Date().getMonth())
   const [selectedDate, setSelectedDate] = useState<string | null>(cached?.selectedDate ?? null)
   const [daySheetOpen, setDaySheetOpen] = useState(false)
+  const [diag, setDiag] = useState('')
   const stateRef = useRef({
     view,
     query,
@@ -176,11 +177,13 @@ export default function ShowsPage() {
 
   // 临时诊断（真机定位用，定位后移除）：从详情页返回时显示记录的滚动值与实际值
   useEffect(() => {
-    if (!/\/shows\/[^/]+$/.test(previousPathname())) return
     const timer = window.setTimeout(() => {
       const main = document.querySelector<HTMLElement>('.app-main')
       const actual = main ? Math.round(main.scrollTop) : -1
       const target = cached ? Math.round(savedScrollTop) : null
+      setDiag(
+        `上一页 ${previousPathname() || '无'}｜记录 ${target ?? '无'}｜实际 ${actual}`
+      )
       push(target == null ? 'error' : 'info', `诊断：记录 ${target ?? '无'} → 实际 ${actual}`)
     }, 700)
     return () => window.clearTimeout(timer)
@@ -435,6 +438,25 @@ export default function ShowsPage() {
 
   return (
     <div className="page">
+      {diag && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 300,
+            background: '#d9a05b',
+            color: '#15131f',
+            fontSize: 11,
+            padding: '6px 10px',
+            textAlign: 'center',
+            fontFamily: 'ui-monospace, Menlo, monospace'
+          }}
+        >
+          调试 {diag}
+        </div>
+      )}
       <PageHeader
         eyebrow="Archive"
         title="我的演出"
