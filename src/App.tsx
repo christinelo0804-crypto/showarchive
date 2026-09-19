@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect } from 'react'
 import { useState } from 'react'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import Layout from './components/Layout'
@@ -7,7 +7,8 @@ import DefaultCategoryMigrationGate from './components/DefaultCategoryMigrationG
 import { Splash } from './components/Splash'
 import { seedIfEmpty } from './db/seed'
 import { applyTheme } from './lib/theme'
-import { consumeScrollRestore } from './lib/scrollRestore'
+import { consumeScrollRestore, recordPathname } from './lib/scrollRestore'
+import { preloadLiveCache } from './lib/liveCache'
 
 const routerBasename =
   import.meta.env.BASE_URL === '/' ? '/' : import.meta.env.BASE_URL.replace(/\/+$/, '')
@@ -40,7 +41,10 @@ function Loading() {
 /** 路由切换时回到页面顶部，避免从设置页中部进入管理页仍停留在原滚动位置。 */
 function ScrollToTop() {
   const { pathname } = useLocation()
-  useEffect(() => {
+  // 用 layout effect：在浏览器绘制前就处理滚动位置，
+  // 避免先按上一页的位置画一帧、再跳到顶部（这是进入次级页面时闪动的来源）
+  useLayoutEffect(() => {
+    recordPathname(pathname)
     // 目标页面会自行恢复滚动位置时（例如从详情页返回列表），跳过置顶
     if (consumeScrollRestore()) return
     const main = document.querySelector<HTMLElement>('.app-main')
@@ -78,6 +82,8 @@ export default function App() {
       void import('./pages/ShowDetailPage')
       void import('./pages/NewShowPage')
       void import('./pages/EditShowPage')
+      // 同时预取这些页面要用的数据，首次进入也能直接渲染
+      preloadLiveCache()
     }
     const idle = (
       window as unknown as {
