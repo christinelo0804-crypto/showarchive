@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Icon } from './ui'
 
@@ -13,7 +14,10 @@ export default function Layout() {
   return (
     <div className="app-shell">
       <main className="app-main">
-        <Outlet />
+        {/* 页面切换时只在内容区显示加载态，底栏与滚动容器保持挂载，避免整屏闪动 */}
+        <Suspense fallback={<p className="muted">加载中…</p>}>
+          <Outlet />
+        </Suspense>
       </main>
       <nav className="bottom-nav" aria-label="主导航">
         {tabs.map((tab) => (

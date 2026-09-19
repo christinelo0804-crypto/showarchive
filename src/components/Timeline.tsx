@@ -2,6 +2,7 @@ import { Fragment, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { ImagePreview } from './ImagePreview'
 import { formatDate } from '../lib/format'
+import { coverColors, coverSize } from '../lib/posterCover'
 import type { Category, City, Show, Venue } from '../types'
 
 interface MonthGroup {
@@ -13,6 +14,18 @@ interface MonthGroup {
 interface YearGroup {
   year: string
   months: MonthGroup[]
+}
+
+function ThumbCover({ show, categoryName }: { show: Show; categoryName: string }) {
+  const colors = coverColors(show.title, categoryName)
+  return (
+    <span
+      className="tl-cover"
+      style={{ background: `linear-gradient(155deg, ${colors[0]}, ${colors[1]})` }}
+    >
+      <span className={`tl-cover-title tl-cover-title-${coverSize(show.title)}`}>{show.title}</span>
+    </span>
+  )
 }
 
 export function Timeline({
@@ -79,7 +92,7 @@ export function Timeline({
                     {show.poster && (show.poster.display || show.poster.thumbnail) ? (
                       <ImagePreview asset={show.poster} alt="" preferThumb />
                     ) : (
-                      <span>{show.title.slice(0, 1)}</span>
+                      <ThumbCover show={show} categoryName={showCategoryName(show)} />
                     )}
                   </span>
                   <span className="tl-body">
