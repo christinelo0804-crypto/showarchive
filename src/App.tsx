@@ -62,6 +62,32 @@ export default function App() {
     applyTheme(stored === 'light' ? 'light' : 'dark')
   }, [])
 
+  // 空闲时预取各页面资源：避免首次进入次级页面时闪一下加载态
+  useEffect(() => {
+    const prefetch = () => {
+      void import('./pages/ShowsPage')
+      void import('./pages/StatsPage')
+      void import('./pages/SettingsPage')
+      void import('./pages/DraftsPage')
+      void import('./pages/RecycleBinPage')
+      void import('./pages/DataManagePage')
+      void import('./pages/CategoryManagePage')
+      void import('./pages/CityVenueManagePage')
+      void import('./pages/LanguageManagePage')
+      void import('./pages/TicketChannelManagePage')
+      void import('./pages/ShowDetailPage')
+      void import('./pages/NewShowPage')
+      void import('./pages/EditShowPage')
+    }
+    const idle = (
+      window as unknown as {
+        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number
+      }
+    ).requestIdleCallback
+    if (idle) idle(prefetch, { timeout: 2500 })
+    else window.setTimeout(prefetch, 1800)
+  }, [])
+
   // iOS 独立模式冷启动时，WebKit 可能先用偏矮的视口布局、底部露出黑边；
   // 趁启动页幕布仍盖着屏幕时，对全高外壳做 display 翻转 + 同步重排，
   // 强制 WebKit 重算视口到真实全屏（社区验证过的修法，启动页不透明，翻转不可见）。
