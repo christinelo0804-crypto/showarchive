@@ -7,7 +7,7 @@ import { Timeline } from '../components/Timeline'
 import { ImagePreview } from '../components/ImagePreview'
 import { useToast } from '../components/Toast'
 import { useCachedLiveQuery } from '../lib/liveCache'
-import { restoreScrollPosition } from '../lib/scrollRestore'
+import { previousPathname, restoreScrollPosition } from '../lib/scrollRestore'
 import { coverColors, coverSize } from '../lib/posterCover'
 import { formatDateWithYear } from '../lib/format'
 import type { Category, Show, Venue } from '../types'
@@ -174,15 +174,14 @@ export default function ShowsPage() {
   const savedScrollTop = cached?.scrollTop ?? 0
   useLayoutEffect(() => restoreScrollPosition(savedScrollTop), [])
 
-  // 临时诊断（真机定位用，定位后移除）：返回后位置不对时在屏幕上提示数值
+  // 临时诊断（真机定位用，定位后移除）：从详情页返回时显示记录的滚动值与实际值
   useEffect(() => {
-    if (cached == null) return
+    if (!/\/shows\/[^/]+$/.test(previousPathname())) return
     const timer = window.setTimeout(() => {
       const main = document.querySelector<HTMLElement>('.app-main')
       const actual = main ? Math.round(main.scrollTop) : -1
-      if (actual !== Math.round(savedScrollTop)) {
-        push('error', `诊断：目标 ${Math.round(savedScrollTop)}，实际 ${actual}`)
-      }
+      const target = cached ? Math.round(savedScrollTop) : null
+      push(target == null ? 'error' : 'info', `诊断：记录 ${target ?? '无'} → 实际 ${actual}`)
     }, 700)
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps

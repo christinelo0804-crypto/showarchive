@@ -7,7 +7,7 @@ import { EmptyState, PageHeader } from '../components/ui'
 import { PosterCard } from '../components/PosterCard'
 import { useToast } from '../components/Toast'
 import { useCachedLiveQuery } from '../lib/liveCache'
-import { restoreScrollPosition } from '../lib/scrollRestore'
+import { previousPathname, restoreScrollPosition } from '../lib/scrollRestore'
 import type { Show } from '../types'
 
 // 瀑布流渐显动画本次会话只播一次（首个可见卡片触发后置位）
@@ -124,15 +124,14 @@ export default function HomePage() {
   // 从详情页返回时恢复滚动位置：绘制前先放回，并在随后约 1.6 秒内守住
   useLayoutEffect(() => restoreScrollPosition(homeScrollTop), [])
 
-  // 临时诊断（真机定位用，定位后移除）：返回后位置不对时在屏幕上提示数值
+  // 临时诊断（真机定位用，定位后移除）：从详情页返回时显示记录的滚动值与实际值
   useEffect(() => {
-    if (homeScrollTop <= 0) return
+    if (!/\/shows\/[^/]+$/.test(previousPathname())) return
     const timer = window.setTimeout(() => {
       const main = document.querySelector<HTMLElement>('.app-main')
       const actual = main ? Math.round(main.scrollTop) : -1
-      if (actual !== Math.round(homeScrollTop)) {
-        push('error', `诊断：目标 ${Math.round(homeScrollTop)}，实际 ${actual}`)
-      }
+      const target = homeScrollTop > 0 ? Math.round(homeScrollTop) : null
+      push(target == null ? 'error' : 'info', `诊断：记录 ${target ?? '无'} → 实际 ${actual}`)
     }, 700)
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps

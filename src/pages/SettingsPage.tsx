@@ -86,6 +86,10 @@ export default function SettingsPage() {
           </Link>
         </div>
       </section>
+
+      <p className="muted" style={{ fontSize: 11, marginTop: 28 }}>
+        版本 {__BUILD_ID__}
+      </p>
     </div>
   )
 }
