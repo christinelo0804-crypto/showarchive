@@ -1,18 +1,19 @@
 // 页面自行恢复滚动位置时，通知路由的置顶逻辑跳过本次重置。
 let pending = false
 
-// 记录路由路径变化：页面可据此判断「本次挂载是否来自详情页返回」。
-let lastPath = ''
-let prevPath = ''
+// 记录路由路径变化（在渲染阶段调用）：页面据此判断「本页是从哪一页过来的」。
+let currentPath = ''
+let priorPath = ''
 
 export function recordPathname(path: string): void {
-  if (path === lastPath) return
-  prevPath = lastPath
-  lastPath = path
+  if (path === currentPath) return
+  priorPath = currentPath
+  currentPath = path
 }
 
-export function previousPathname(): string {
-  return prevPath
+/** 上一页的路径；在当前页渲染阶段即可取到。 */
+export function previousRoutePathname(): string {
+  return priorPath
 }
 
 export function markScrollRestore(): void {
