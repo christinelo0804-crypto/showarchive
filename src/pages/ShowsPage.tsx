@@ -1,13 +1,12 @@
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { db } from '../db/db'
 import { activeShows, draftShows } from '../db/repositories'
 import { Button, EmptyState, PageHeader } from '../components/ui'
 import { Timeline } from '../components/Timeline'
 import { ImagePreview } from '../components/ImagePreview'
-import { useToast } from '../components/Toast'
 import { useCachedLiveQuery } from '../lib/liveCache'
-import { previousRoutePathname, restoreScrollPosition } from '../lib/scrollRestore'
+import { persistBrowseState, previousRoutePathname, readBrowseState } from '../lib/scrollRestore'
 import { coverColors, coverSize } from '../lib/posterCover'
 import { formatDateWithYear } from '../lib/format'
 import type { Category, Show, Venue } from '../types'
@@ -73,23 +72,24 @@ interface ShowsBrowseState {
   year: number
   month: number
   selectedDate: string | null
-  scrollTop: number
   savedAt: number
 }
 let showsBrowseCache: ShowsBrowseState | null = null
-// 滚动过程中持续记录最新位置，避免离开页面时读取时机被“回到顶部”覆盖成 0
-let showsScrollTop = 0
 
 export default function ShowsPage() {
-  const { push } = useToast()
   // 恢复上次浏览状态的判断：不依赖路由跟踪（真机上不可靠），
   // 只排除「从新增/编辑表单返回」的情况，并要求记录足够新（5 分钟内）。
   const prevRoute = previousRoutePathname()
   const fromForm = /^\/(new|shows\/[^/]+\/edit)/.test(prevRoute)
-  const cacheFresh =
-    showsBrowseCache != null && Date.now() - showsBrowseCache.savedAt < 5 * 60 * 1000
-  const shouldRestore = !fromForm && cacheFresh
-  const cached = shouldRestore ? showsBrowseCache : null
+  // 记录来源：模块缓存（快）优先，否则用 sessionStorage（可跨页面重载保留）
+  const storedBrowse = readBrowseState<ShowsBrowseState>('shows')
+  const candidates = [showsBrowseCache, storedBrowse?.state]
+    .filter((item): item is ShowsBrowseState => item != null)
+    .filter((item) => Date.now() - item.savedAt < 5 * 60 * 1000)
+    .sort((a, b) => b.savedAt - a.savedAt)
+  const record = candidates[0] ?? null
+  const shouldRestore = !fromForm && record != null
+  const cached = shouldRestore ? record : null
   const [view, setView] = useState<ViewMode>(cached?.view ?? 'list')
   const [query, setQuery] = useState(cached?.query ?? '')
   const [statuses, setStatuses] = useState<string[]>(cached?.statuses ?? [])
@@ -106,7 +106,6 @@ export default function ShowsPage() {
   const [month, setMonth] = useState(() => cached?.month ?? new Date().getMonth())
   const [selectedDate, setSelectedDate] = useState<string | null>(cached?.selectedDate ?? null)
   const [daySheetOpen, setDaySheetOpen] = useState(false)
-  const [diag, setDiag] = useState('')
   const stateRef = useRef({
     view,
     query,
@@ -146,53 +145,14 @@ export default function ShowsPage() {
   const languages = useCachedLiveQuery('languages', () => db.languages.toArray())
   const channels = useCachedLiveQuery('ticket-channels', () => db.ticketChannels.toArray())
 
-  // 监听滚动容器，持续记录「我的演出」页的滚动位置
+  // 持续保存浏览状态（视图模式 / 搜索 / 筛选 / 日历年月），从详情页返回时恢复
   useEffect(() => {
-    const main = document.querySelector<HTMLElement>('.app-main')
-    const onScroll = () => {
-      const mainTop = main ? main.scrollTop : 0
-      const winTop = window.scrollY || document.documentElement.scrollTop || 0
-      showsScrollTop = Math.max(mainTop, winTop)
-      // 滚动位置同步写入缓存（不依赖卸载时机）
-      if (showsBrowseCache) {
-        showsBrowseCache = { ...showsBrowseCache, scrollTop: showsScrollTop, savedAt: Date.now() }
-      }
-    }
-    main?.addEventListener('scroll', onScroll, { passive: true })
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => {
-      main?.removeEventListener('scroll', onScroll)
-      window.removeEventListener('scroll', onScroll)
-    }
-  }, [])
-
-  // 持续保存浏览状态：状态一变化就写入模块缓存（不依赖页面卸载时机，真机上更可靠）
-  useEffect(() => {
-    showsBrowseCache = { ...stateRef.current, scrollTop: showsScrollTop, savedAt: Date.now() }
+    showsBrowseCache = { ...stateRef.current, savedAt: Date.now() }
+    persistBrowseState('shows', showsBrowseCache)
   })
 
   // 从详情页返回时恢复滚动位置：绘制前先放回，并在随后约 1.6 秒内守住
   // （iOS 的滚动恢复可能稍后才把容器重置为 0；用户主动滚动后立即停止干预）
-  const savedScrollTop = cached?.scrollTop ?? 0
-  useLayoutEffect(() => restoreScrollPosition(savedScrollTop), [])
-
-  // 临时诊断（真机定位用，定位后移除）：从详情页返回时显示记录的滚动值与实际值
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const main = document.querySelector<HTMLElement>('.app-main')
-      const actual = main ? Math.round(main.scrollTop) : -1
-      const target = cached ? Math.round(savedScrollTop) : null
-      setDiag(
-        `上一页${prevRoute || '空'} 缓存${showsBrowseCache ? '有' : '无'} 记忆${Math.round(
-          showsScrollTop
-        )} 记录${target ?? '无'} 实际${actual} 恢复${shouldRestore ? '是' : '否'}`
-      )
-      push(target == null ? 'error' : 'info', `诊断：记录 ${target ?? '无'} → 实际 ${actual}`)
-    }, 700)
-    return () => window.clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   const cityNameMap = useMemo(() => new Map((cities ?? []).map((c) => [c.id, c.name])), [cities])
   const venueNameMap = useMemo(() => new Map((venues ?? []).map((v) => [v.id, v.name])), [venues])
   const categoryNameMap = useMemo(
@@ -441,25 +401,6 @@ export default function ShowsPage() {
 
   return (
     <div className="page">
-      {diag && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 300,
-            background: '#d9a05b',
-            color: '#15131f',
-            fontSize: 11,
-            padding: '6px 10px',
-            textAlign: 'center',
-            fontFamily: 'ui-monospace, Menlo, monospace'
-          }}
-        >
-          调试 {diag}
-        </div>
-      )}
       <PageHeader
         eyebrow="Archive"
         title="我的演出"
