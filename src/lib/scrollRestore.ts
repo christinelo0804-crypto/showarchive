@@ -1,6 +1,20 @@
 // 页面自行恢复滚动位置时，通知路由的置顶逻辑跳过本次重置。
 let pending = false
 
+// 记录路由路径变化：页面可据此判断「本次挂载是否来自详情页返回」。
+let lastPath = ''
+let prevPath = ''
+
+export function recordPathname(path: string): void {
+  if (path === lastPath) return
+  prevPath = lastPath
+  lastPath = path
+}
+
+export function previousPathname(): string {
+  return prevPath
+}
+
 export function markScrollRestore(): void {
   pending = true
 }
