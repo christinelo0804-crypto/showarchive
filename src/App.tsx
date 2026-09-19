@@ -44,13 +44,19 @@ function ScrollToTop() {
   // 用 layout effect：在浏览器绘制前就处理滚动位置，
   // 避免先按上一页的位置画一帧、再跳到顶部（这是进入次级页面时闪动的来源）
   useLayoutEffect(() => {
-    recordPathname(pathname)
     // 目标页面会自行恢复滚动位置时（例如从详情页返回列表），跳过置顶
     if (consumeScrollRestore()) return
     const main = document.querySelector<HTMLElement>('.app-main')
     if (main) main.scrollTop = 0
     else window.scrollTo(0, 0)
   }, [pathname])
+  return null
+}
+
+/** 在渲染阶段记录路由路径：页面渲染时即可知道「上一页是哪一页」。 */
+function RouteTracker() {
+  const { pathname } = useLocation()
+  recordPathname(pathname)
   return null
 }
 
@@ -120,8 +126,9 @@ export default function App() {
   return (
     <>
       {!splashDone && <Splash onDone={() => setSplashDone(true)} />}
-      <BrowserRouter basename={routerBasename}>
-        <ScrollToTop />
+    <BrowserRouter basename={routerBasename}>
+      <RouteTracker />
+      <ScrollToTop />
         <ToastProvider>
           <DefaultCategoryMigrationGate />
           <Suspense fallback={<Loading />}>
