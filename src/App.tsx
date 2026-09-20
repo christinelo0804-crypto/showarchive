@@ -5,6 +5,7 @@ import Layout from './components/Layout'
 import { ToastProvider } from './components/Toast'
 import DefaultCategoryMigrationGate from './components/DefaultCategoryMigrationGate'
 import { Splash } from './components/Splash'
+import ReminderGate from './components/ReminderGate'
 import { seedIfEmpty } from './db/seed'
 import { applyTheme } from './lib/theme'
 import { recordPathname } from './lib/scrollRestore'
@@ -127,6 +128,8 @@ export default function App() {
     <BrowserRouter basename={routerBasename}>
       <RouteTracker />
       <ScrollToTop />
+        {/* 启动页结束后检查是否有需要提醒的演出（每天首次冷启动弹一次） */}
+        {splashDone && <ReminderGate />}
         <ToastProvider>
           <DefaultCategoryMigrationGate />
           <Suspense fallback={<Loading />}>
