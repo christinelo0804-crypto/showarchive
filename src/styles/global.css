@@ -1301,6 +1301,142 @@ a {
   font-weight: 700;
 }
 
+/* 月历头部的年份下拉：与表单日历的年份选择保持一致 */
+.calendar-year-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.calendar-year {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-amber-soft);
+  color: var(--color-amber);
+  font-family: inherit;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.calendar-year-chev {
+  font-size: 9px;
+  color: var(--color-kicker);
+}
+
+.calendar-year-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 75;
+  width: 120px;
+  max-height: 240px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 4px;
+  background: var(--color-pop);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-glass);
+}
+
+.calendar-year-menu::-webkit-scrollbar {
+  display: none;
+}
+
+.calendar-year-opt {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-1);
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.calendar-year-opt:hover {
+  background: var(--color-amber-soft);
+  color: var(--color-amber);
+}
+
+.calendar-year-opt.on {
+  color: var(--color-amber);
+  font-weight: 600;
+}
+
+/* 月历头部的月份下拉：与年份下拉同一套观感，12 项用 3 列网格，无需滚动 */
+.calendar-month-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.calendar-month {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-amber-soft);
+  color: var(--color-amber);
+  font-family: inherit;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.calendar-month-chev {
+  font-size: 9px;
+  color: var(--color-kicker);
+}
+
+.calendar-month-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 75;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  width: 156px;
+  padding: 4px;
+  background: var(--color-pop);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-glass);
+}
+
+.calendar-month-opt {
+  padding: 7px 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-1);
+  font-size: var(--fs-sm);
+  text-align: center;
+  cursor: pointer;
+}
+
+.calendar-month-opt:hover {
+  background: var(--color-amber-soft);
+  color: var(--color-amber);
+}
+
+.calendar-month-opt.on {
+  color: var(--color-amber);
+  font-weight: 600;
+}
+
 .calendar-nav {
   display: flex;
   gap: var(--space-2);
@@ -1705,6 +1841,70 @@ a {
 }
 
 .picker-cal-year-opt.on {
+  color: var(--color-amber);
+  font-weight: 600;
+}
+
+/* 日历标题中的月份可点选：12 项用 3 列网格，无需滚动 */
+.picker-cal-month-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.picker-cal-month {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-amber-soft);
+  color: var(--color-amber);
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.picker-cal-month-chev {
+  font-size: 9px;
+  color: var(--color-kicker);
+}
+
+.picker-cal-month-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 75;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  width: 156px;
+  padding: 4px;
+  background: var(--color-pop);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-glass);
+}
+
+.picker-cal-month-opt {
+  padding: 7px 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-1);
+  font-size: var(--fs-sm);
+  text-align: center;
+  cursor: pointer;
+}
+
+.picker-cal-month-opt:hover {
+  background: var(--color-amber-soft);
+  color: var(--color-amber);
+}
+
+.picker-cal-month-opt.on {
   color: var(--color-amber);
   font-weight: 600;
 }
