@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import type { ChangeEvent } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { ChangeEvent, ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import {
@@ -11,13 +11,14 @@ import {
 } from '../db/repositories'
 import type { ShowPayload } from '../db/repositories'
 import { processImageFile } from '../lib/image'
-import type { Category, ImageAsset, Show, ShowStatus } from '../types'
+import type { Category, ImageAsset, PosterCrop, Show, ShowStatus } from '../types'
 import { Button, PageHeader, SectionTitle, StarRating } from './ui'
 import { ConfirmDialog } from './ConfirmDialog'
 import { ImagePreview } from './ImagePreview'
 import { Select } from './Select'
 import { DatePicker } from './DatePicker'
 import { TimePicker } from './TimePicker'
+import { PosterCropEditor } from './PosterCropEditor'
 import { useToast } from './Toast'
 
 interface FormState {
@@ -46,6 +47,7 @@ interface FormState {
   review: string
   notes: string
   poster: ImageAsset | null
+  posterCrop: PosterCrop | null
   ticketImage: ImageAsset | null
   seatViewImage: ImageAsset | null
   noteImages: ImageAsset[]
@@ -90,6 +92,7 @@ function initialForm(): FormState {
     review: '',
     notes: '',
     poster: null,
+    posterCrop: null,
     ticketImage: null,
     seatViewImage: null,
     noteImages: []
@@ -123,6 +126,7 @@ function formFromShow(show: Show): FormState {
     review: show.review ?? '',
     notes: show.notes ?? '',
     poster: show.poster ?? null,
+    posterCrop: show.posterCrop ?? null,
     ticketImage: show.ticketImage ?? null,
     seatViewImage: show.seatViewImage ?? null,
     noteImages: show.noteImages ?? []
@@ -207,11 +211,14 @@ function EntityPicker({
 function ImageUploader({
   label,
   asset,
-  onChange
+  onChange,
+  action
 }: {
   label: string
   asset: ImageAsset | null
   onChange: (asset: ImageAsset | null) => void
+  /** 预览下方的额外按钮（如「调整裁切」） */
+  action?: ReactNode
 }) {
   async function handleFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -227,10 +234,15 @@ function ImageUploader({
         <input type="file" accept="image/*" onChange={(e) => void handleFile(e)} hidden />
         {asset ? <ImagePreview asset={asset} alt={label} /> : <span>点击选择图片</span>}
       </label>
-      {asset && (
-        <Button type="button" variant="ghost" onClick={() => onChange(null)}>
-          移除图片
-        </Button>
+      {(asset || action) && (
+        <div className="upload-actions">
+          {action}
+          {asset && (
+            <Button type="button" variant="ghost" onClick={() => onChange(null)}>
+              移除图片
+            </Button>
+          )}
+        </div>
       )}
     </div>
   )
@@ -309,7 +321,19 @@ export function ShowForm({
   const [addingCategory2, setAddingCategory2] = useState(false)
   const [addingLanguage, setAddingLanguage] = useState(false)
   const [addingChannel, setAddingChannel] = useState(false)
+  const [cropOpen, setCropOpen] = useState(false)
   const initializedRef = useRef(false)
+
+  // 裁切编辑器需要海报的图片地址（ImagePreview 内部的缓存不对外暴露）
+  const posterUrl = useMemo(() => {
+    const source = form.poster?.display ?? form.poster?.thumbnail
+    return source ? URL.createObjectURL(source) : null
+  }, [form.poster])
+  useEffect(() => {
+    return () => {
+      if (posterUrl) URL.revokeObjectURL(posterUrl)
+    }
+  }, [posterUrl])
 
   const bySort = (a: Category, b: Category) =>
     a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'zh-CN')
@@ -485,6 +509,7 @@ export function ShowForm({
           review: form.review,
           notes: form.notes,
           poster: form.poster ?? undefined,
+          posterCrop: form.posterCrop ?? undefined,
           ticketImage: form.ticketImage ?? undefined,
           seatViewImage: form.seatViewImage ?? undefined,
           noteImages: form.noteImages.length > 0 ? form.noteImages : undefined
@@ -811,7 +836,18 @@ export function ShowForm({
             <ImageUploader
               label="海报"
               asset={form.poster}
-              onChange={(a) => setField('poster', a)}
+              onChange={(a) => {
+                setField('poster', a)
+                // 换了海报后，原来的裁切设置不再适用
+                setField('posterCrop', null)
+              }}
+              action={
+                form.poster && posterUrl ? (
+                  <Button type="button" variant="ghost" onClick={() => setCropOpen(true)}>
+                    调整裁切{form.posterCrop ? ' · 已裁切' : ''}
+                  </Button>
+                ) : undefined
+              }
             />
             <ImageUploader
               label="票根图"
@@ -879,6 +915,19 @@ export function ShowForm({
           </Button>
         </div>
       </form>
+
+      {cropOpen && posterUrl && (
+        <PosterCropEditor
+          url={posterUrl}
+          poster={form.poster ?? undefined}
+          initial={form.posterCrop}
+          onCancel={() => setCropOpen(false)}
+          onApply={(next) => {
+            setField('posterCrop', next)
+            setCropOpen(false)
+          }}
+        />
+      )}
 
       <ConfirmDialog
         open={discardOpen}
