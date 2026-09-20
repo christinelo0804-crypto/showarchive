@@ -4,7 +4,7 @@ import { db } from '../db/db'
 import { activeShows, draftShows } from '../db/repositories'
 import { Button, EmptyState, PageHeader } from '../components/ui'
 import { Timeline } from '../components/Timeline'
-import { ImagePreview } from '../components/ImagePreview'
+import { PosterThumb } from '../components/PosterThumb'
 import { useCachedLiveQuery } from '../lib/liveCache'
 import { persistBrowseState, previousRoutePathname, readBrowseState } from '../lib/scrollRestore'
 import { consumeShowsLanding, onShowsLanding } from '../lib/showsLanding'
@@ -458,7 +458,14 @@ export default function ShowsPage() {
   function MiniPoster({ show }: { show: Show }) {
     const poster = show.poster
     if (poster && (poster.display || poster.thumbnail)) {
-      return <ImagePreview asset={poster} alt="" className="cal-poster-img" preferThumb />
+      return (
+        <PosterThumb
+          poster={poster}
+          posterCrop={show.posterCrop}
+          title={show.title}
+          className="cal-poster-img"
+        />
+      )
     }
     const colors = coverColors(
       show.title,
@@ -997,7 +1004,12 @@ export default function ShowsPage() {
                   <Link key={show.id} to={`/shows/${show.id}`} className="day-sheet-item">
                     <span className="day-sheet-thumb">
                       {poster && (poster.display || poster.thumbnail) ? (
-                        <ImagePreview asset={poster} alt="" className="day-sheet-thumb-img" preferThumb />
+                        <PosterThumb
+                          poster={poster}
+                          posterCrop={show.posterCrop}
+                          title={show.title}
+                          className="day-sheet-thumb-img"
+                        />
                       ) : (
                         <span
                           className="day-sheet-cover"
