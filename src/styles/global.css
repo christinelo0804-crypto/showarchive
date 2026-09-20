@@ -352,6 +352,23 @@ a {
   object-fit: cover;
 }
 
+/* 横版海报：整体完整显示，上下用同一张海报的模糊放大版填充 */
+.poster-fit-bg {
+  position: absolute;
+  inset: -14%;
+  object-fit: cover;
+  filter: blur(14px) saturate(1.15) brightness(0.72);
+  transform: scale(1.08);
+}
+
+.poster-fit-img {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .poster-cover {
   position: absolute;
   inset: 0;
@@ -731,6 +748,218 @@ a {
   font-size: var(--fs-xs);
 }
 
+/* ---------- 海报裁切编辑器 ---------- */
+
+.crop-editor {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  padding: calc(16px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom));
+  background: rgba(10, 10, 18, 0.96);
+  /* 固定深色浮层：内部用 --on-dark-* 令牌（深浅主题共用同一组值） */
+  color: var(--on-dark-ink);
+  animation: fade-in 0.15s ease;
+}
+
+.crop-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.crop-editor-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+}
+
+.crop-editor-head .close-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--on-dark-line);
+  border-radius: 50%;
+  background: var(--on-dark-surface);
+  color: var(--on-dark-strong);
+  font-size: var(--fs-base);
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* 浮层内的分段控件与次要按钮：同样用固定浅色（筛选抽屉里的分段控件仍跟随主题） */
+.crop-editor .panel-seg {
+  border-color: var(--on-dark-line);
+}
+
+.crop-editor .panel-seg button {
+  color: var(--on-dark-strong);
+}
+
+.crop-editor .panel-seg button.on {
+  background: var(--on-dark-amber-soft);
+  color: var(--on-dark-amber);
+}
+
+.crop-editor-foot .btn-ghost {
+  border-color: var(--on-dark-line);
+  background: var(--on-dark-surface);
+  color: var(--on-dark-strong);
+}
+
+.crop-editor-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+}
+
+.crop-frame {
+  position: relative;
+  width: min(70vw, 250px);
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: #0d0d18;
+  /* 拖动时不要触发页面滚动 */
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+
+.crop-frame:active {
+  cursor: grabbing;
+}
+
+.crop-frame-fit {
+  cursor: default;
+}
+
+.crop-blur {
+  position: absolute;
+  inset: -14%;
+  object-fit: cover;
+  filter: blur(14px) saturate(1.15) brightness(0.72);
+  transform: scale(1.08);
+}
+
+.crop-image {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.crop-thirds {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: inherit;
+  background-image:
+    linear-gradient(to right, transparent calc(33.33% - 0.5px), rgba(255, 255, 255, 0.14) 33.33%, transparent calc(33.33% + 0.5px)),
+    linear-gradient(to right, transparent calc(66.66% - 0.5px), rgba(255, 255, 255, 0.14) 66.66%, transparent calc(66.66% + 0.5px)),
+    linear-gradient(to bottom, transparent calc(33.33% - 0.5px), rgba(255, 255, 255, 0.14) 33.33%, transparent calc(33.33% + 0.5px)),
+    linear-gradient(to bottom, transparent calc(66.66% - 0.5px), rgba(255, 255, 255, 0.14) 66.66%, transparent calc(66.66% + 0.5px));
+}
+
+.crop-hint {
+  margin: 0;
+  max-width: 320px;
+  /* 固定最小高度：两种模式的说明文字行数不同，避免切换时整体跳动 */
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-sm);
+  color: var(--on-dark);
+  text-align: center;
+  line-height: 1.6;
+}
+
+.crop-editor-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.crop-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  /* 固定高度：完整显示模式下没有快捷定位按钮，保留同样高度避免切换时跳动 */
+  min-height: 32px;
+  align-items: center;
+}
+
+.crop-chips-note {
+  font-size: var(--fs-sm);
+  color: var(--on-dark-soft);
+}
+
+.crop-chip {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--on-dark-line);
+  border-radius: var(--radius-md);
+  background: var(--on-dark-surface);
+  color: var(--on-dark-strong);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.crop-chip.on {
+  border-color: var(--on-dark-amber-border);
+  background: var(--on-dark-amber-soft);
+  color: var(--on-dark-amber);
+}
+
+.crop-chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.crop-slider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--fs-sm);
+  color: var(--on-dark);
+}
+
+.crop-slider input[type='range'] {
+  flex: 1;
+  accent-color: var(--on-dark-amber);
+}
+
+.crop-scale-value {
+  min-width: 42px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.crop-editor-foot {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.crop-editor-foot .btn {
+  flex: 1;
+}
+
+/* 图片字段下方的操作按钮（调整裁切 / 移除图片） */
+.upload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 /* ---------- 每天首次冷启动的演出提醒 ---------- */
 
 .remind-section {
@@ -1053,6 +1282,28 @@ a {
 .calendar-nav {
   display: flex;
   gap: var(--space-2);
+}
+
+/* 月历头部的「回到今天」与翻月按钮 */
+.calendar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.calendar-today {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-amber);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.calendar-today:disabled {
+  color: var(--color-text-2);
+  cursor: default;
 }
 
 .icon-btn {
@@ -2981,9 +3232,9 @@ td.pivot-lv {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  border: 1px solid rgba(236, 230, 220, 0.25);
-  background: rgba(20, 22, 36, 0.6);
-  color: #ece6dc;
+  border: 1px solid var(--on-dark-line);
+  background: var(--on-dark-surface);
+  color: var(--on-dark-ink);
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
@@ -2997,9 +3248,9 @@ td.pivot-lv {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  border: 1px solid rgba(236, 230, 220, 0.25);
-  background: rgba(20, 22, 36, 0.6);
-  color: #ece6dc;
+  border: 1px solid var(--on-dark-line);
+  background: var(--on-dark-surface);
+  color: var(--on-dark-ink);
   font-size: 24px;
   line-height: 1;
   cursor: pointer;
@@ -3021,10 +3272,10 @@ td.pivot-lv {
   z-index: 5;
   padding: 6px 14px;
   border-radius: 999px;
-  background: rgba(20, 22, 36, 0.72);
-  border: 1px solid rgba(236, 230, 220, 0.25);
+  background: var(--on-dark-surface-strong);
+  border: 1px solid var(--on-dark-line);
   font-size: var(--fs-sm);
-  color: rgba(236, 230, 220, 0.85);
+  color: var(--on-dark-strong);
   font-variant-numeric: tabular-nums;
 }
 
@@ -3035,7 +3286,7 @@ td.pivot-lv {
   transform: translateX(-50%);
   z-index: 5;
   font-size: var(--fs-sm);
-  color: rgba(236, 230, 220, 0.6);
+  color: var(--on-dark-soft);
 }
 
 /* ---------- 筛选抽屉 ---------- */
@@ -3289,7 +3540,7 @@ td.pivot-lv {
   display: flex;
   gap: 4px;
   padding: 3px;
-  border: 1px solid var(--color-line-soft);
+  border: 1px solid var(--color-line);
   border-radius: var(--radius-md);
   margin-bottom: 8px;
 }
@@ -3300,7 +3551,8 @@ td.pivot-lv {
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--color-text-2);
+  /* 未选中的选项也要看得清（原来用 text-2，在深色上几乎不可见） */
+  color: var(--color-text-1);
   font-size: var(--fs-sm);
   cursor: pointer;
 }
