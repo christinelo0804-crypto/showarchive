@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type { ImageAsset, PosterCrop } from '../types'
 
 /**
@@ -29,4 +30,13 @@ export function posterRatio(poster?: ImageAsset): number {
   const height = poster?.height
   if (!width || !height) return 2 / 3
   return width / height
+}
+
+/** 把裁切设置转成图片的内联样式（缩略图与网格共用）。 */
+export function cropImageStyle(crop: PosterCrop): CSSProperties {
+  return {
+    objectFit: crop.mode === 'fit' ? 'contain' : 'cover',
+    objectPosition: `${crop.x}% ${crop.y}%`,
+    transform: crop.scale !== 1 ? `scale(${crop.scale})` : undefined
+  }
 }
