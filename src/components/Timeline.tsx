@@ -1,6 +1,6 @@
 import { Fragment, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { ImagePreview } from './ImagePreview'
+import { PosterThumb } from './PosterThumb'
 import { formatDate } from '../lib/format'
 import { coverColors, coverSize } from '../lib/posterCover'
 import type { Category, City, Show, Venue } from '../types'
@@ -71,6 +71,9 @@ export function Timeline({
   )
   const cityNameMap = useMemo(() => new Map(cities.map((c) => [c.id, c.name])), [cities])
   const venueNameMap = useMemo(() => new Map(venues.map((v) => [v.id, v.name])), [venues])
+  // 自动封面的配色与首页一致：按「一级类别」取色（列表副标题仍用二级优先）
+  const level1Name = (show: Show) =>
+    show.categoryLevel1Id ? categoryNameMap.get(show.categoryLevel1Id) ?? '' : ''
   const showCategoryName = (show: Show) =>
     (show.categoryLevel2Id ? categoryNameMap.get(show.categoryLevel2Id) : undefined) ??
     (show.categoryLevel1Id ? categoryNameMap.get(show.categoryLevel1Id) : undefined) ??
@@ -90,9 +93,14 @@ export function Timeline({
                 <Link key={show.id} to={`/shows/${show.id}`} className="timeline-item">
                   <span className="tl-thumb">
                     {show.poster && (show.poster.display || show.poster.thumbnail) ? (
-                      <ImagePreview asset={show.poster} alt="" preferThumb />
+                      <PosterThumb
+                        poster={show.poster}
+                        posterCrop={show.posterCrop}
+                        title={show.title}
+                        className=""
+                      />
                     ) : (
-                      <ThumbCover show={show} categoryName={showCategoryName(show)} />
+                      <ThumbCover show={show} categoryName={level1Name(show)} />
                     )}
                   </span>
                   <span className="tl-body">

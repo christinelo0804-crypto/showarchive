@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { CSSProperties } from 'react'
 import type { ImageAsset } from '../types'
 
 // 模块级图片链接缓存：同一 Blob 只生成一次 ObjectURL，
@@ -9,11 +10,14 @@ export function ImagePreview({
   asset,
   alt,
   className,
+  style,
   preferThumb = false
 }: {
   asset: ImageAsset
   alt?: string
   className?: string
+  /** 内联样式（如裁切参数） */
+  style?: CSSProperties
   /** 小尺寸场景（日历格子、抽屉缩略图）优先用 400px 缩略图，避免解码大图卡顿 */
   preferThumb?: boolean
 }) {
@@ -33,5 +37,5 @@ export function ImagePreview({
     imageUrlCache.set(source, u)
     setUrl(u)
   }, [asset, preferThumb])
-  return url ? <img className={className} src={url} alt={alt ?? ''} /> : null
+  return url ? <img className={className} src={url} alt={alt ?? ''} style={style} /> : null
 }

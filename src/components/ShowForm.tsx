@@ -19,6 +19,7 @@ import { Select } from './Select'
 import { DatePicker } from './DatePicker'
 import { TimePicker } from './TimePicker'
 import { PosterCropEditor } from './PosterCropEditor'
+import { PosterThumb } from './PosterThumb'
 import { useToast } from './Toast'
 
 interface FormState {
@@ -212,13 +213,16 @@ function ImageUploader({
   label,
   asset,
   onChange,
-  action
+  action,
+  crop
 }: {
   label: string
   asset: ImageAsset | null
   onChange: (asset: ImageAsset | null) => void
   /** 预览下方的额外按钮（如「调整裁切」） */
   action?: ReactNode
+  /** 传入时按海报规则预览（2:3 比例 + 应用裁切），与首页网格一致 */
+  crop?: PosterCrop | null
 }) {
   async function handleFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -232,7 +236,22 @@ function ImageUploader({
       <label>{label}</label>
       <label className="upload-zone">
         <input type="file" accept="image/*" onChange={(e) => void handleFile(e)} hidden />
-        {asset ? <ImagePreview asset={asset} alt={label} /> : <span>点击选择图片</span>}
+        {asset ? (
+          crop !== undefined ? (
+            <span className="poster-preview">
+              <PosterThumb
+                poster={asset}
+                posterCrop={crop}
+                title={label}
+                className="poster-preview-img"
+              />
+            </span>
+          ) : (
+            <ImagePreview asset={asset} alt={label} />
+          )
+        ) : (
+          <span>点击选择图片</span>
+        )}
       </label>
       {(asset || action) && (
         <div className="upload-actions">
@@ -836,6 +855,7 @@ export function ShowForm({
             <ImageUploader
               label="海报"
               asset={form.poster}
+              crop={form.posterCrop}
               onChange={(a) => {
                 setField('poster', a)
                 // 换了海报后，原来的裁切设置不再适用
