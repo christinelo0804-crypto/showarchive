@@ -355,10 +355,13 @@ a {
 /* 横版海报：整体完整显示，上下用同一张海报的模糊放大版填充 */
 .poster-fit-bg {
   position: absolute;
-  inset: -14%;
+  inset: 0;
+  /* 必须显式给宽高：img 是替换元素，只有 inset 时会退化成原始尺寸贴左上角 */
+  width: 100%;
+  height: 100%;
   object-fit: cover;
   filter: blur(14px) saturate(1.15) brightness(0.72);
-  transform: scale(1.08);
+  transform: scale(1.16);
 }
 
 .poster-fit-img {
@@ -372,9 +375,12 @@ a {
 /* 小缩略图（月历格 / 时间线 / 日期抽屉）里的「完整显示」：模糊放大版填充留白 */
 .thumb-fit-bg {
   position: absolute;
-  inset: -12%;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
   filter: blur(8px) saturate(1.15) brightness(0.72);
+  transform: scale(1.16);
 }
 
 .thumb-fit-fg {
@@ -855,10 +861,12 @@ a {
 
 .crop-blur {
   position: absolute;
-  inset: -14%;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
   filter: blur(14px) saturate(1.15) brightness(0.72);
-  transform: scale(1.08);
+  transform: scale(1.16);
 }
 
 .crop-image {
