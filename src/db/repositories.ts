@@ -36,6 +36,8 @@ export interface ShowPayload {
   content?: string
   ticketChannelId?: string
   poster?: ImageAsset
+  /** 海报裁切设置（手动设置时保存，为空则按宽高比自动判断） */
+  posterCrop?: Show['posterCrop']
   faceValue?: number
   paidPrice?: number
   rating?: number
@@ -65,6 +67,7 @@ export async function saveShow(input: ShowPayload, opts: { publish: boolean }): 
     content: input.content,
     ticketChannelId: input.ticketChannelId,
     poster: input.poster,
+    posterCrop: input.posterCrop,
     faceValue: input.faceValue,
     paidPrice: input.paidPrice,
     rating: input.rating,
@@ -103,6 +106,7 @@ export async function updateShow(id: string, input: ShowPayload, opts: { publish
     review: input.review,
     notes: input.notes,
     poster: input.poster,
+    posterCrop: input.posterCrop,
     ticketImage: input.ticketImage,
     seatViewImage: input.seatViewImage,
     noteImages: input.noteImages,
