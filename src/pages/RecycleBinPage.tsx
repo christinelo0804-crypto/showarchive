@@ -41,7 +41,11 @@ export default function RecycleBinPage() {
         back
         action={
           (trashed?.length ?? 0) > 0 ? (
-            <Button type="button" variant="danger" onClick={() => void handleEmpty()}>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={() => setConfirmAction({ type: 'empty' })}
+            >
               清空回收站
             </Button>
           ) : undefined
