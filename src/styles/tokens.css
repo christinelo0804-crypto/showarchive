@@ -8,6 +8,8 @@
   --color-surface-strong: rgba(236, 230, 220, 0.08);
   --color-line: rgba(236, 230, 220, 0.14);
   --color-line-soft: rgba(236, 230, 220, 0.08);
+  /* 更淡的线：用于抽屉分隔等不希望被注意到的地方 */
+  --color-line-faint: rgba(236, 230, 220, 0.05);
   --color-elevated: #171726;
   --color-pop: rgba(28, 30, 52, 0.96);
   --color-actions-bg: rgba(20, 22, 36, 0.92);
@@ -51,8 +53,10 @@
   --fs-2xl: 2rem;
 
   --shadow-glass: 0 14px 44px rgba(0, 0, 0, 0.5);
-  /* 底部导航胶囊：深色下黑色阴影几乎不可见，改用双层阴影撑出轮廓 */
-  --shadow-nav: 0 2px 6px rgba(0, 0, 0, 0.45), 0 14px 32px rgba(0, 0, 0, 0.4);
+  /* 底部导航胶囊：深色下黑色阴影几乎不可见，用双层阴影 + 顶部边光撑出轮廓 */
+  --shadow-nav:
+    0 3px 8px rgba(0, 0, 0, 0.6), 0 18px 40px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 238, 214, 0.07);
   --nav-height: 78px;
   /* 导航胶囊下沿到屏幕底的间隙（含安全区） */
   --nav-gap: max(12px, env(safe-area-inset-bottom));
@@ -79,6 +83,7 @@
   --color-surface-strong: rgba(255, 253, 248, 0.92);
   --color-line: rgba(82, 68, 47, 0.16);
   --color-line-soft: rgba(82, 68, 47, 0.09);
+  --color-line-faint: rgba(82, 68, 47, 0.055);
   --color-elevated: #fffdf8;
   --color-pop: rgba(255, 253, 248, 0.98);
   --color-actions-bg: rgba(248, 244, 236, 0.94);

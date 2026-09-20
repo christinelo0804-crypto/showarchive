@@ -533,6 +533,11 @@ a {
   border-color: var(--color-amber-border);
 }
 
+.status-expired {
+  color: var(--color-danger);
+  border-color: var(--color-danger-border);
+}
+
 /* ---------- 时间线 ---------- */
 
 .timeline {
@@ -714,6 +719,126 @@ a {
   border: 1px solid var(--color-amber-border);
   color: var(--color-amber);
   font-size: var(--fs-xs);
+}
+
+.tl-expired {
+  display: inline-block;
+  margin-top: 5px;
+  padding: 2px 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-danger-border);
+  color: var(--color-danger);
+  font-size: var(--fs-xs);
+}
+
+/* ---------- 每天首次冷启动的演出提醒 ---------- */
+
+.remind-section {
+  margin-bottom: var(--space-4);
+}
+
+.remind-section:last-of-type {
+  margin-bottom: 0;
+}
+
+.remind-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--color-text-1);
+}
+
+.remind-head b {
+  color: var(--color-amber);
+  font-weight: 600;
+}
+
+.remind-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-amber);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* 与应用内「我的演出」列表一致：日期列 + 标题/副标题 + 右侧标签，虚线分隔、无卡片底色 */
+.remind-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.remind-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 12px 2px;
+  border-bottom: 1px dashed var(--color-line-soft);
+}
+
+.remind-row:last-child {
+  border-bottom: none;
+}
+
+.remind-date {
+  flex-shrink: 0;
+  width: 76px;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--color-amber);
+}
+
+.remind-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.remind-name {
+  display: block;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-base);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.remind-sub {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--fs-sm);
+  color: var(--color-text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.remind-tag {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border: 1px solid var(--color-danger-border);
+  border-radius: var(--radius-md);
+  color: var(--color-danger);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+
+.remind-tag-soon {
+  border-color: var(--color-amber-border);
+  color: var(--color-amber);
+}
+
+/* 筛选抽屉里「已过期」选项的文字用红色，与列表状态一致 */
+.filter-expired-label {
+  color: var(--color-danger);
 }
 
 /* ---------- 草稿卡片 ---------- */
@@ -1008,6 +1133,10 @@ a {
 
 .cal-dot-watched {
   background: var(--color-ok);
+}
+
+.cal-dot-expired {
+  background: var(--color-danger);
 }
 
 .cal-poster {
@@ -2926,7 +3055,7 @@ td.pivot-lv {
   padding: 20px 20px calc(18px + env(safe-area-inset-bottom));
   border-radius: 20px 20px 0 0;
   background: var(--color-elevated);
-  border-top: 1px solid var(--color-line);
+  border-top: 1px solid var(--color-line-faint);
   box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.5);
   animation: drawer-in 0.25s ease;
 }
@@ -2940,11 +3069,29 @@ td.pivot-lv {
 }
 
 .drawer-body {
+  position: relative;
   display: flex;
   flex: 1;
   min-height: 0;
   margin-top: 12px;
-  border-top: 1px solid var(--color-line-soft);
+}
+
+/* 内部横向分隔线：两端渐隐，减弱存在感 */
+.drawer-body::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-line-faint) 14%,
+    var(--color-line-faint) 86%,
+    transparent
+  );
+  pointer-events: none;
 }
 
 .filter-tabs {
@@ -2953,7 +3100,7 @@ td.pivot-lv {
   padding: 6px 0 10px;
   overflow-y: auto;
   scrollbar-width: none;
-  border-right: 1px solid var(--color-line-soft);
+  border-right: 1px solid var(--color-line-faint);
 }
 
 .filter-tabs::-webkit-scrollbar {
@@ -3014,6 +3161,40 @@ td.pivot-lv {
   scrollbar-width: none;
 }
 
+/* 当前筛选条件下的演出数量（列表 / 月历 / 时间线共用一行） */
+.show-count {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0 2px 10px;
+  margin-bottom: var(--space-2);
+  border-bottom: 1px dashed var(--color-line-soft);
+  font-size: var(--fs-sm);
+  color: var(--color-text-2);
+}
+
+.show-count b {
+  font-family: var(--font-display);
+  font-size: var(--fs-base);
+  color: var(--color-amber);
+}
+
+/* 筛选抽屉标题右侧的数量 */
+.drawer-count {
+  font-size: var(--fs-sm);
+  color: var(--color-text-2);
+  white-space: nowrap;
+  margin-left: auto;
+  margin-right: var(--space-3);
+}
+
+.drawer-count b {
+  font-family: var(--font-display);
+  font-size: var(--fs-base);
+  color: var(--color-amber);
+}
+
+
 .filter-panel::-webkit-scrollbar {
   display: none;
 }
@@ -3049,6 +3230,44 @@ td.pivot-lv {
 .filter-item.parent {
   color: var(--color-text-0);
   font-weight: 500;
+  gap: 6px;
+}
+
+/* 父级展开/收起（一级类别、城市） */
+.filter-expand {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: -6px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-2);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.filter-expand.open {
+  transform: rotate(90deg);
+  color: var(--color-amber);
+}
+
+.filter-expand-empty {
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.filter-parent-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .filter-item.child {
@@ -3063,6 +3282,75 @@ td.pivot-lv {
   height: 17px;
   accent-color: var(--color-amber);
   cursor: pointer;
+}
+
+/* 筛选面板内的切换（如评分的「及以上 / 精确」） */
+.panel-seg {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--color-line-soft);
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+}
+
+.panel-seg button {
+  flex: 1;
+  padding: 6px 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-2);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.panel-seg button.on {
+  background: var(--color-amber-soft);
+  color: var(--color-amber);
+}
+
+/* 评分档位：数值 + 星标（支持半星） */
+.filter-item-with-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-rating-value {
+  min-width: 26px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--color-text-2);
+}
+
+.filter-unrated {
+  color: var(--color-text-2);
+}
+
+.filter-stars {
+  display: inline-flex;
+  gap: 1px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.filter-star {
+  color: var(--color-text-2);
+  opacity: 0.5;
+}
+
+.filter-star-on {
+  color: var(--color-amber);
+  opacity: 1;
+}
+
+.filter-star-half {
+  color: transparent;
+  opacity: 1;
+  background: linear-gradient(90deg, var(--color-amber) 50%, var(--color-text-2) 50%);
+  -webkit-background-clip: text;
+  background-clip: text;
 }
 
 @keyframes drawer-in {
@@ -3103,9 +3391,27 @@ td.pivot-lv {
 }
 
 .drawer-filter .drawer-foot {
+  position: relative;
   margin-top: 0;
   padding-top: 12px;
-  border-top: 1px solid var(--color-line-soft);
+}
+
+/* 底部按钮上方的分隔线：同样两端渐隐 */
+.drawer-filter .drawer-foot::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-line-faint) 14%,
+    var(--color-line-faint) 86%,
+    transparent
+  );
+  pointer-events: none;
 }
 
 .drawer-foot .btn {
