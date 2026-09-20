@@ -143,7 +143,7 @@ export default function ShowDetailPage() {
 
       <div className="detail-meta">
         <span className={`status-chip status-${show.status}`}>
-          {show.status === 'upcoming' ? '待观看' : '已观看'}
+          {show.status === 'upcoming' ? '待观看' : show.status === 'expired' ? '已过期' : '已观看'}
         </span>
         {displayCategoryName && <span className="category-chip">{displayCategoryName}</span>}
         {languageName && <span className="category-chip">{languageName}</span>}

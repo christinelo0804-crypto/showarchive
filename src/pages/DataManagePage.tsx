@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { useCachedLiveQuery } from '../lib/liveCache'
+import { todayISO } from '../lib/format'
 import { Button, PageHeader, SectionTitle } from '../components/ui'
 import { Modal } from '../components/Modal'
 import { useToast } from '../components/Toast'
@@ -36,7 +37,7 @@ export default function DataManagePage() {
     try {
       const result = await gatherExportData()
       const blob = await buildArchiveBlob(result)
-      const filename = `ShowArchive-${new Date().toISOString().slice(0, 10)}.showarchive`
+      const filename = `ShowArchive-${todayISO()}.showarchive`
       downloadBlob(blob, filename)
       toast.push('success', `已导出 ${result.data.shows.length} 条记录`)
     } catch (err) {

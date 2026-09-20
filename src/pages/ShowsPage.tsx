@@ -7,6 +7,7 @@ import { Timeline } from '../components/Timeline'
 import { ImagePreview } from '../components/ImagePreview'
 import { useCachedLiveQuery } from '../lib/liveCache'
 import { persistBrowseState, previousRoutePathname, readBrowseState } from '../lib/scrollRestore'
+import { consumeShowsLanding, onShowsLanding } from '../lib/showsLanding'
 import { coverColors, coverSize } from '../lib/posterCover'
 import { formatDateWithYear } from '../lib/format'
 import type { Category, Show, Venue } from '../types'
@@ -16,16 +17,36 @@ type ViewMode = 'list' | 'calendar' | 'timeline'
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 
 /** 筛选抽屉的分组（两列布局的左列）。 */
-type FilterTab = 'status' | 'category' | 'place' | 'year' | 'language' | 'channel'
+type FilterTab = 'status' | 'category' | 'place' | 'year' | 'rating' | 'language' | 'channel'
 
 const FILTER_TABS: Array<{ key: FilterTab; label: string }> = [
   { key: 'status', label: '状态' },
   { key: 'category', label: '类别' },
   { key: 'place', label: '地点' },
   { key: 'year', label: '年份' },
+  { key: 'rating', label: '评分' },
   { key: 'language', label: '语言' },
   { key: 'channel', label: '购票渠道' }
 ]
+
+/** 评分筛选档位（半星步进）与「未评分」。 */
+const RATING_LEVELS = ['5', '4.5', '4', '3.5', '3', '2.5', '2', '1.5', '1', '0.5']
+
+/** 评分星标（半星用半填充显示）。 */
+function RatingStars({ value }: { value: number }) {
+  return (
+    <span className="filter-stars">
+      {[1, 2, 3, 4, 5].map((i) => {
+        const cls = value >= i ? 'on' : value >= i - 0.5 ? 'half' : ''
+        return (
+          <span key={i} className={`filter-star${cls ? ` filter-star-${cls}` : ''}`}>
+            ★
+          </span>
+        )
+      })}
+    </span>
+  )
+}
 
 /** 在数组中增删某个值（多选筛选用）。 */
 function toggleIn(list: string[], value: string, on: boolean): string[] {
@@ -69,6 +90,8 @@ interface ShowsBrowseState {
   languageIds: string[]
   channelIds: string[]
   years: string[]
+  ratingLevels: string[]
+  ratingMode: 'gte' | 'exact'
   year: number
   month: number
   selectedDate: string | null
@@ -100,6 +123,10 @@ export default function ShowsPage() {
   const [languageIds, setLanguageIds] = useState<string[]>(cached?.languageIds ?? [])
   const [channelIds, setChannelIds] = useState<string[]>(cached?.channelIds ?? [])
   const [years, setYears] = useState<string[]>(cached?.years ?? [])
+  const [ratingLevels, setRatingLevels] = useState<string[]>(cached?.ratingLevels ?? [])
+  const [ratingMode, setRatingMode] = useState<'gte' | 'exact'>(cached?.ratingMode ?? 'gte')
+  // 父级展开状态（按 id 记录）；未手动设置过的父级，有勾选子级时默认展开
+  const [expandedParents, setExpandedParents] = useState<Record<string, boolean>>({})
   const [filterTab, setFilterTab] = useState<FilterTab>('status')
   const [filterOpen, setFilterOpen] = useState(false)
   const [year, setYear] = useState(() => cached?.year ?? new Date().getFullYear())
@@ -117,6 +144,8 @@ export default function ShowsPage() {
     languageIds,
     channelIds,
     years,
+    ratingLevels,
+    ratingMode,
     year,
     month,
     selectedDate
@@ -132,6 +161,8 @@ export default function ShowsPage() {
     languageIds,
     channelIds,
     years,
+    ratingLevels,
+    ratingMode,
     year,
     month,
     selectedDate
@@ -150,6 +181,26 @@ export default function ShowsPage() {
     showsBrowseCache = { ...stateRef.current, savedAt: Date.now() }
     persistBrowseState('shows', showsBrowseCache)
   })
+
+  // 提醒弹窗跳转过来时：只保留「待观看 + 已过期」状态筛选，清掉其他条件
+  useEffect(() => {
+    const applyLanding = (statusList: string[]) => {
+      setStatuses(statusList)
+      setCat1Ids([])
+      setCat2Ids([])
+      setCityIds([])
+      setVenueIds([])
+      setYears([])
+      setRatingLevels([])
+      setLanguageIds([])
+      setChannelIds([])
+      setQuery('')
+      setView('list')
+    }
+    const landing = consumeShowsLanding()
+    if (landing) applyLanding(landing.statuses)
+    return onShowsLanding((next) => applyLanding(next.statuses))
+  }, [])
 
   // 从详情页返回时恢复滚动位置：绘制前先放回，并在随后约 1.6 秒内守住
   // （iOS 的滚动恢复可能稍后才把容器重置为 0；用户主动滚动后立即停止干预）
@@ -212,6 +263,9 @@ export default function ShowsPage() {
     const yearSet = new Set(years)
     const languageSet = new Set(languageIds)
     const channelSet = new Set(channelIds)
+    // 评分：'none' 表示未评分；其余为半星档位，按「及以上」或「精确」匹配
+    const wantUnrated = ratingLevels.includes('none')
+    const ratingTargets = ratingLevels.filter((v) => v !== 'none').map(Number)
     return (shows ?? []).filter((s) => {
       if (statusSet.size > 0 && !statusSet.has(s.status)) return false
       // 类别：一级与二级合并为一组，组内任一匹配（勾一级=涵盖其全部二级）
@@ -229,6 +283,18 @@ export default function ShowsPage() {
         return false
       if (channelSet.size > 0 && !(s.ticketChannelId != null && channelSet.has(s.ticketChannelId)))
         return false
+      if (ratingLevels.length > 0) {
+        if (s.rating == null) {
+          if (!wantUnrated) return false
+        } else {
+          const hit =
+            ratingTargets.length > 0 &&
+            (ratingMode === 'gte'
+              ? ratingTargets.some((lv) => s.rating! >= lv)
+              : ratingTargets.some((lv) => Math.abs(s.rating! - lv) < 0.001))
+          if (!hit) return false
+        }
+      }
       if (terms.length === 0) return true
       // 搜索覆盖全部用户填写的内容、关联名称与日期；多个关键词需全部命中
       const hay = [
@@ -259,6 +325,8 @@ export default function ShowsPage() {
     cityIds,
     venueIds,
     years,
+    ratingLevels,
+    ratingMode,
     languageIds,
     channelIds,
     cities,
@@ -308,10 +376,24 @@ export default function ShowsPage() {
     category: cat1Ids.length + catPartialCount,
     place: cityIds.length + cityPartialCount,
     year: years.length,
+    rating: ratingLevels.length,
     language: languageIds.length,
     channel: channelIds.length
   }
   const activeFilterCount = FILTER_TABS.filter((t) => tabCounts[t.key] > 0).length
+
+  /** 父级是否展开：手动设置优先，否则有勾选子级时自动展开。 */
+  function isParentExpanded(id: string, hasCheckedChild: boolean): boolean {
+    const manual = expandedParents[id]
+    return manual === undefined ? hasCheckedChild : manual
+  }
+
+  function toggleParentExpanded(id: string, currentlyOpen: boolean) {
+    setExpandedParents((prev) => ({ ...prev, [id]: !currentlyOpen }))
+  }
+  // 当前条件下的演出数量：无任何筛选/搜索时显示总数
+  const totalCount = (shows ?? []).length
+  const hasConditions = activeFilterCount > 0 || query.trim() !== ''
 
   const showsByDate = useMemo(() => {
     const map = new Map<string, Show[]>()
@@ -332,6 +414,7 @@ export default function ShowsPage() {
     setLanguageIds([])
     setChannelIds([])
     setYears([])
+    setRatingLevels([])
   }
 
   // 勾选一级类别 → 同步勾选其全部二级；取消则同步取消
@@ -454,6 +537,18 @@ export default function ShowsPage() {
         </Link>
       </div>
 
+      <div className="show-count">
+        {hasConditions ? (
+          <>
+            筛选后 <b>{filtered.length}</b> 场 · 共 {totalCount} 场
+          </>
+        ) : (
+          <>
+            共 <b>{totalCount}</b> 场
+          </>
+        )}
+      </div>
+
       {view === 'list' ? (
         filtered.length === 0 ? (
           shows === undefined ? (
@@ -473,7 +568,7 @@ export default function ShowsPage() {
                   </span>
                 </span>
                 <span className={`status-chip status-${show.status}`}>
-                  {show.status === 'upcoming' ? '待观看' : '已观看'}
+                  {show.status === 'upcoming' ? '待观看' : show.status === 'expired' ? '已过期' : '已观看'}
                 </span>
               </Link>
             ))}
@@ -522,7 +617,11 @@ export default function ShowsPage() {
                         <i
                           key={s.id}
                           className={`cal-dot ${
-                            s.status === 'upcoming' ? 'cal-dot-upcoming' : 'cal-dot-watched'
+                            s.status === 'upcoming'
+                              ? 'cal-dot-upcoming'
+                              : s.status === 'expired'
+                                ? 'cal-dot-expired'
+                                : 'cal-dot-watched'
                           }`}
                         />
                       ))}
@@ -559,6 +658,9 @@ export default function ShowsPage() {
           <div className="drawer drawer-filter" onClick={(e) => e.stopPropagation()}>
             <div className="drawer-head">
               <h3>筛选</h3>
+              <span className="drawer-count">
+                符合条件 <b>{filtered.length}</b> 场
+              </span>
               <button
                 type="button"
                 className="icon-btn"
@@ -605,6 +707,14 @@ export default function ShowsPage() {
                         onChange={(on) => setStatuses((prev) => toggleIn(prev, 'watched', on))}
                       />
                     </label>
+                    <label className="filter-item">
+                      <span className="filter-expired-label">已过期</span>
+                      <TriCheckbox
+                        checked={statuses.includes('expired')}
+                        indeterminate={false}
+                        onChange={(on) => setStatuses((prev) => toggleIn(prev, 'expired', on))}
+                      />
+                    </label>
                   </>
                 )}
 
@@ -621,10 +731,28 @@ export default function ShowsPage() {
                         kids.length > 0 ? checkedCount === kids.length : cat1Ids.includes(parent.id)
                       const partial =
                         kids.length > 0 && checkedCount > 0 && checkedCount < kids.length
+                      const open = isParentExpanded(parent.id, checkedCount > 0)
                       return (
                         <Fragment key={parent.id}>
                           <label className="filter-item parent">
-                            <span>{parent.name}</span>
+                            {kids.length > 0 ? (
+                              <button
+                                type="button"
+                                className={`filter-expand${open ? ' open' : ''}`}
+                                aria-label={open ? '收起' : '展开'}
+                                aria-expanded={open}
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  toggleParentExpanded(parent.id, open)
+                                }}
+                              >
+                                ›
+                              </button>
+                            ) : (
+                              <span className="filter-expand filter-expand-empty" />
+                            )}
+                            <span className="filter-parent-name">{parent.name}</span>
                             <TriCheckbox
                               checked={allChecked}
                               indeterminate={partial}
@@ -635,7 +763,7 @@ export default function ShowsPage() {
                               }
                             />
                           </label>
-                          {kids.map((kid) => (
+                          {open && kids.map((kid) => (
                             <label key={kid.id} className="filter-item child">
                               <span>{kid.name}</span>
                               <TriCheckbox
@@ -661,10 +789,28 @@ export default function ShowsPage() {
                         kids.length > 0 ? checkedCount === kids.length : cityIds.includes(cityItem.id)
                       const partial =
                         kids.length > 0 && checkedCount > 0 && checkedCount < kids.length
+                      const open = isParentExpanded(cityItem.id, checkedCount > 0)
                       return (
                         <Fragment key={cityItem.id}>
                           <label className="filter-item parent">
-                            <span>{cityItem.name}</span>
+                            {kids.length > 0 ? (
+                              <button
+                                type="button"
+                                className={`filter-expand${open ? ' open' : ''}`}
+                                aria-label={open ? '收起' : '展开'}
+                                aria-expanded={open}
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  toggleParentExpanded(cityItem.id, open)
+                                }}
+                              >
+                                ›
+                              </button>
+                            ) : (
+                              <span className="filter-expand filter-expand-empty" />
+                            )}
+                            <span className="filter-parent-name">{cityItem.name}</span>
                             <TriCheckbox
                               checked={allChecked}
                               indeterminate={partial}
@@ -675,7 +821,7 @@ export default function ShowsPage() {
                               }
                             />
                           </label>
-                          {kids.map((venueItem) => (
+                          {open && kids.map((venueItem) => (
                             <label key={venueItem.id} className="filter-item child">
                               <span>{venueItem.name}</span>
                               <TriCheckbox
@@ -704,6 +850,53 @@ export default function ShowsPage() {
                         />
                       </label>
                     ))}
+                  </>
+                )}
+
+                {filterTab === 'rating' && (
+                  <>
+                    <div className="panel-seg">
+                      <button
+                        type="button"
+                        className={ratingMode === 'gte' ? 'on' : ''}
+                        onClick={() => setRatingMode('gte')}
+                      >
+                        及以上
+                      </button>
+                      <button
+                        type="button"
+                        className={ratingMode === 'exact' ? 'on' : ''}
+                        onClick={() => setRatingMode('exact')}
+                      >
+                        精确
+                      </button>
+                    </div>
+                    <p className="filter-panel-hint">
+                      {ratingMode === 'gte'
+                        ? '勾 4.5 = 4.5 星及更高（含 5 星）'
+                        : '勾 4.5 = 只显示 4.5 星'}
+                    </p>
+                    {RATING_LEVELS.map((lv) => (
+                      <label key={lv} className="filter-item">
+                        <span className="filter-item-with-stars">
+                          <span className="filter-rating-value">{lv}</span>
+                          <RatingStars value={Number(lv)} />
+                        </span>
+                        <TriCheckbox
+                          checked={ratingLevels.includes(lv)}
+                          indeterminate={false}
+                          onChange={(on) => setRatingLevels((prev) => toggleIn(prev, lv, on))}
+                        />
+                      </label>
+                    ))}
+                    <label className="filter-item">
+                      <span className="filter-unrated">未评分</span>
+                      <TriCheckbox
+                        checked={ratingLevels.includes('none')}
+                        indeterminate={false}
+                        onChange={(on) => setRatingLevels((prev) => toggleIn(prev, 'none', on))}
+                      />
+                    </label>
                   </>
                 )}
 
@@ -803,6 +996,13 @@ export default function ShowsPage() {
                       <span className="day-sheet-sub">
                         {showCategoryName(show)} · {cityName(show.cityId)} · {venueName(show.venueId)}
                       </span>
+                    </span>
+                    <span className={`status-chip status-${show.status}`}>
+                      {show.status === 'upcoming'
+                        ? '待观看'
+                        : show.status === 'expired'
+                          ? '已过期'
+                          : '已观看'}
                     </span>
                     <span className="day-sheet-arrow">›</span>
                   </Link>
