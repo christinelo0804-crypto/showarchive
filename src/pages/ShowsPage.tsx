@@ -15,6 +15,7 @@ import type { Category, Show, Venue } from '../types'
 type ViewMode = 'list' | 'calendar' | 'timeline'
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
+const MONTH_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
 /** 筛选抽屉的分组（两列布局的左列）。 */
 type FilterTab = 'status' | 'category' | 'place' | 'year' | 'rating' | 'language' | 'channel'
@@ -131,6 +132,9 @@ export default function ShowsPage() {
   const [filterOpen, setFilterOpen] = useState(false)
   const [year, setYear] = useState(() => cached?.year ?? new Date().getFullYear())
   const [month, setMonth] = useState(() => cached?.month ?? new Date().getMonth())
+  const [yearMenuOpen, setYearMenuOpen] = useState(false)
+  const [monthMenuOpen, setMonthMenuOpen] = useState(false)
+  const calendarMenuRef = useRef<HTMLHeadingElement | null>(null)
   const [selectedDate, setSelectedDate] = useState<string | null>(cached?.selectedDate ?? null)
   const [daySheetOpen, setDaySheetOpen] = useState(false)
   const stateRef = useRef({
@@ -347,7 +351,6 @@ export default function ShowsPage() {
   }, [year, month])
 
   const dayShows = selectedDate ? filtered.filter((s) => s.date === selectedDate) : []
-  const monthTitle = `${year} 年 ${month + 1} 月`
 
   const yearOptions = useMemo(() => {
     const set = new Set<string>()
@@ -357,6 +360,22 @@ export default function ShowsPage() {
     }
     return [...set].sort((a, b) => (a < b ? 1 : a > b ? -1 : 0))
   }, [shows])
+
+  /** 月历年份下拉的候选年份：演出数据覆盖的区间（含今年与当前正在浏览的年份），从新到旧。 */
+  const calendarYearOptions = useMemo(() => {
+    const dataYears: number[] = []
+    for (const s of shows ?? []) {
+      const y = Number(s.date.slice(0, 4))
+      if (Number.isFinite(y) && y > 0) dataYears.push(y)
+    }
+    const thisYear = new Date().getFullYear()
+    const bounds = dataYears.length > 0 ? [...dataYears, thisYear, year] : [thisYear, year]
+    const latest = Math.max(...bounds)
+    const earliest = Math.min(...bounds)
+    const list: number[] = []
+    for (let y = latest; y >= earliest; y--) list.push(y)
+    return list
+  }, [shows, year])
 
   // 左列角标：树状分组按「整选/半选的父级数」计数，其他分组按勾选项数计数
   const catPartialCount = level1.filter((p) => {
@@ -482,6 +501,8 @@ export default function ShowsPage() {
   }
 
   function changeMonth(delta: number) {
+    setYearMenuOpen(false)
+    setMonthMenuOpen(false)
     const next = new Date(year, month + delta, 1)
     setYear(next.getFullYear())
     setMonth(next.getMonth())
@@ -493,11 +514,55 @@ export default function ShowsPage() {
   const now = new Date()
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth()
   function goToday() {
+    setYearMenuOpen(false)
+    setMonthMenuOpen(false)
     setYear(now.getFullYear())
     setMonth(now.getMonth())
     setSelectedDate(null)
     setDaySheetOpen(false)
   }
+
+  /** 年份下拉：切换年份时保持当前月份，避免跳年后再手动翻月。 */
+  function pickYear(nextYear: number) {
+    setYearMenuOpen(false)
+    setMonthMenuOpen(false)
+    if (nextYear === year) return
+    setYear(nextYear)
+    setSelectedDate(null)
+    setDaySheetOpen(false)
+  }
+
+  /** 月份下拉：切换月份时保持当前年份。 */
+  function pickMonth(nextMonth: number) {
+    setMonthMenuOpen(false)
+    if (nextMonth === month) return
+    setMonth(nextMonth)
+    setSelectedDate(null)
+    setDaySheetOpen(false)
+  }
+
+  // 年份 / 月份下拉：点击外部或按 Esc 关闭
+  useEffect(() => {
+    if (!yearMenuOpen && !monthMenuOpen) return
+    const onDocClick = (e: globalThis.MouseEvent) => {
+      if (calendarMenuRef.current && !calendarMenuRef.current.contains(e.target as Node)) {
+        setYearMenuOpen(false)
+        setMonthMenuOpen(false)
+      }
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setYearMenuOpen(false)
+        setMonthMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDocClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [yearMenuOpen, monthMenuOpen])
 
   return (
     <div className="page">
@@ -594,7 +659,72 @@ export default function ShowsPage() {
       ) : view === 'calendar' ? (
         <>
           <div className="calendar-head">
-            <h2 className="calendar-title">{monthTitle}</h2>
+            <h2 className="calendar-title" ref={calendarMenuRef}>
+              <span className="calendar-year-wrap">
+                <button
+                  type="button"
+                  className="calendar-year"
+                  onClick={() => {
+                    setMonthMenuOpen(false)
+                    setYearMenuOpen((o) => !o)
+                  }}
+                  aria-haspopup="listbox"
+                  aria-expanded={yearMenuOpen}
+                  aria-label="选择年份"
+                >
+                  {year} <span className="calendar-year-chev">▾</span>
+                </button>
+                {yearMenuOpen && (
+                  <span className="calendar-year-menu" role="listbox" aria-label="年份">
+                    {calendarYearOptions.map((y) => (
+                      <button
+                        key={y}
+                        type="button"
+                        role="option"
+                        aria-selected={y === year}
+                        className={`calendar-year-opt ${y === year ? 'on' : ''}`}
+                        onClick={() => pickYear(y)}
+                      >
+                        {y} 年
+                      </button>
+                    ))}
+                  </span>
+                )}
+              </span>{' '}
+              年
+              <span className="calendar-month-wrap">
+                <button
+                  type="button"
+                  className="calendar-month"
+                  onClick={() => {
+                    setYearMenuOpen(false)
+                    setMonthMenuOpen((o) => !o)
+                  }}
+                  aria-haspopup="listbox"
+                  aria-expanded={monthMenuOpen}
+                  aria-label="选择月份"
+                >
+                  {month + 1} <span className="calendar-month-chev">▾</span>
+                </button>
+                {monthMenuOpen && (
+                  <span className="calendar-month-menu" role="listbox" aria-label="月份">
+                    {MONTH_NUMBERS.map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        role="option"
+                        aria-selected={m - 1 === month}
+                        className={`calendar-month-opt ${m - 1 === month ? 'on' : ''}`}
+                        onClick={() => pickMonth(m - 1)}
+                      >
+                        {m} 月
+                      </button>
+                    ))}
+                  </span>
+                )}
+              </span>
+              月
+            </h2>
             <div className="calendar-actions">
               <button
                 type="button"
