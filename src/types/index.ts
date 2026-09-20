@@ -1,4 +1,5 @@
-export type ShowStatus = 'upcoming' | 'watched'
+/** 观看状态：待观看 / 已观看 / 已过期（已过期为系统自动标记，不出现在新增与编辑表单） */
+export type ShowStatus = 'upcoming' | 'watched' | 'expired'
 
 /** 图片资产：V1 只保留展示图与缩略图，不保留原图。 */
 export interface ImageAsset {
