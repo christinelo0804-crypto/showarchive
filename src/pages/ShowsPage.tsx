@@ -482,6 +482,16 @@ export default function ShowsPage() {
     setDaySheetOpen(false)
   }
 
+  // 月历：当前是否已经在看本月；「回到今天」跳到本月并清除选中日期
+  const now = new Date()
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth()
+  function goToday() {
+    setYear(now.getFullYear())
+    setMonth(now.getMonth())
+    setSelectedDate(null)
+    setDaySheetOpen(false)
+  }
+
   return (
     <div className="page">
       <PageHeader
@@ -578,13 +588,23 @@ export default function ShowsPage() {
         <>
           <div className="calendar-head">
             <h2 className="calendar-title">{monthTitle}</h2>
-            <div className="calendar-nav">
-              <button type="button" className="icon-btn" onClick={() => changeMonth(-1)} aria-label="上个月">
-                ‹
+            <div className="calendar-actions">
+              <button
+                type="button"
+                className="calendar-today"
+                onClick={goToday}
+                disabled={isCurrentMonth}
+              >
+                回到今天
               </button>
-              <button type="button" className="icon-btn" onClick={() => changeMonth(1)} aria-label="下个月">
-                ›
-              </button>
+              <div className="calendar-nav">
+                <button type="button" className="icon-btn" onClick={() => changeMonth(-1)} aria-label="上个月">
+                  ‹
+                </button>
+                <button type="button" className="icon-btn" onClick={() => changeMonth(1)} aria-label="下个月">
+                  ›
+                </button>
+              </div>
             </div>
           </div>
           <div className="calendar-grid">
