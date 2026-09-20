@@ -1,6 +1,25 @@
 import { addShowEncoded, db, putShowEncoded } from './db'
 import { createId, nowIso } from '../lib/id'
+import { todayISO } from '../lib/format'
 import type { Category, ImageAsset, Show } from '../types'
+
+/**
+ * 把「待观看且演出日期早于今天」的已发布记录标记为「已过期」（不含草稿与回收站）。
+ * 返回被标记的条数。
+ */
+export async function expireOverdueShows(): Promise<number> {
+  const today = todayISO()
+  const all = await db.shows.toArray()
+  const overdue = all.filter(
+    (s) => !s.deletedAt && !s.isDraft && s.status === 'upcoming' && s.date < today
+  )
+  if (overdue.length === 0) return 0
+  const now = nowIso()
+  await db.shows.bulkUpdate(
+    overdue.map((s) => ({ key: s.id, changes: { status: 'expired' as const, updatedAt: now } }))
+  )
+  return overdue.length
+}
 
 export interface ShowPayload {
   title: string
