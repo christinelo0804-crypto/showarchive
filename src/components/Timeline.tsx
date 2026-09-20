@@ -105,6 +105,8 @@ export function Timeline({
                     <span className="tl-date">{formatDate(show.date)}</span>
                     {show.status === 'upcoming' ? (
                       <span className="tl-upcoming">待观看</span>
+                    ) : show.status === 'expired' ? (
+                      <span className="tl-expired">已过期</span>
                     ) : show.rating != null ? (
                       <span className="tl-rating">★ {show.rating.toFixed(1)}</span>
                     ) : null}

@@ -52,7 +52,10 @@ interface FormState {
 }
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10)
+  // 用本地日期而非 UTC：东八区凌晨 0–8 点用 toISOString 会差一天
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 function nowTime(): string {
