@@ -46,6 +46,7 @@ export interface ExportedShow {
   review?: string
   notes?: string
   poster?: ExportedImageRef
+  posterCrop?: Show['posterCrop']
   ticketImage?: ExportedImageRef
   seatViewImage?: ExportedImageRef
   noteImages?: ExportedImageRef[]
@@ -161,6 +162,7 @@ export async function gatherExportData(): Promise<ExportResult> {
       review: show.review,
       notes: show.notes,
       poster: collectAsset(show.poster, `media/${show.id}/poster`, media),
+      posterCrop: show.posterCrop,
       ticketImage: collectAsset(show.ticketImage, `media/${show.id}/ticket`, media),
       seatViewImage: collectAsset(show.seatViewImage, `media/${show.id}/seat`, media),
       noteImages: (show.noteImages ?? [])
@@ -315,6 +317,7 @@ async function exportedShowToShow(parsed: ParsedArchive, s: ExportedShow): Promi
     status: s.status,
     isDraft: false,
     poster,
+    posterCrop: s.posterCrop,
     ticketImage,
     seatViewImage,
     noteImages: noteImages.filter((a): a is StoredImageAsset => a != null),
