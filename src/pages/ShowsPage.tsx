@@ -9,7 +9,8 @@ import { useCachedLiveQuery } from '../lib/liveCache'
 import { persistBrowseState, previousRoutePathname, readBrowseState } from '../lib/scrollRestore'
 import { consumeShowsLanding, onShowsLanding } from '../lib/showsLanding'
 import { coverColors, coverSize } from '../lib/posterCover'
-import { formatDateWithYear } from '../lib/format'
+import { formatDateWithYear, formatMoney } from '../lib/format'
+import { PRICE_BUCKETS } from '../lib/stats'
 import type { Category, Show, Venue } from '../types'
 
 type ViewMode = 'list' | 'calendar' | 'timeline'
@@ -17,14 +18,32 @@ type ViewMode = 'list' | 'calendar' | 'timeline'
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 const MONTH_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
+/** 价格快捷档位：与统计页「实付价区间」维度共用同一套阈值。 */
+const PRICE_STEP = 10
+
+const PRICE_PRESETS = PRICE_BUCKETS.map((bucket, i) => ({
+  label: bucket.label,
+  min: i === 0 ? null : PRICE_BUCKETS[i - 1].max,
+  max: Number.isFinite(bucket.max) ? bucket.max : null
+}))
+
 /** 筛选抽屉的分组（两列布局的左列）。 */
-type FilterTab = 'status' | 'category' | 'place' | 'year' | 'rating' | 'language' | 'channel'
+type FilterTab =
+  | 'status'
+  | 'category'
+  | 'place'
+  | 'time'
+  | 'price'
+  | 'rating'
+  | 'language'
+  | 'channel'
 
 const FILTER_TABS: Array<{ key: FilterTab; label: string }> = [
   { key: 'status', label: '状态' },
   { key: 'category', label: '类别' },
   { key: 'place', label: '地点' },
-  { key: 'year', label: '年份' },
+  { key: 'time', label: '时间' },
+  { key: 'price', label: '价格' },
   { key: 'rating', label: '评分' },
   { key: 'language', label: '语言' },
   { key: 'channel', label: '购票渠道' }
@@ -91,6 +110,10 @@ interface ShowsBrowseState {
   languageIds: string[]
   channelIds: string[]
   years: string[]
+  months: string[]
+  priceMin: number | null
+  priceMax: number | null
+  includeUnpriced: boolean
   ratingLevels: string[]
   ratingMode: 'gte' | 'exact'
   year: number
@@ -124,6 +147,10 @@ export default function ShowsPage() {
   const [languageIds, setLanguageIds] = useState<string[]>(cached?.languageIds ?? [])
   const [channelIds, setChannelIds] = useState<string[]>(cached?.channelIds ?? [])
   const [years, setYears] = useState<string[]>(cached?.years ?? [])
+  const [months, setMonths] = useState<string[]>(cached?.months ?? [])
+  const [priceMin, setPriceMin] = useState<number | null>(cached?.priceMin ?? null)
+  const [priceMax, setPriceMax] = useState<number | null>(cached?.priceMax ?? null)
+  const [includeUnpriced, setIncludeUnpriced] = useState(cached?.includeUnpriced ?? false)
   const [ratingLevels, setRatingLevels] = useState<string[]>(cached?.ratingLevels ?? [])
   const [ratingMode, setRatingMode] = useState<'gte' | 'exact'>(cached?.ratingMode ?? 'gte')
   // 父级展开状态（按 id 记录）；未手动设置过的父级，有勾选子级时默认展开
@@ -148,6 +175,10 @@ export default function ShowsPage() {
     languageIds,
     channelIds,
     years,
+    months,
+    priceMin,
+    priceMax,
+    includeUnpriced,
     ratingLevels,
     ratingMode,
     year,
@@ -165,6 +196,10 @@ export default function ShowsPage() {
     languageIds,
     channelIds,
     years,
+    months,
+    priceMin,
+    priceMax,
+    includeUnpriced,
     ratingLevels,
     ratingMode,
     year,
@@ -195,6 +230,10 @@ export default function ShowsPage() {
       setCityIds([])
       setVenueIds([])
       setYears([])
+      setMonths([])
+      setPriceMin(null)
+      setPriceMax(null)
+      setIncludeUnpriced(false)
       setRatingLevels([])
       setLanguageIds([])
       setChannelIds([])
@@ -235,6 +274,9 @@ export default function ShowsPage() {
   const byName = (a: { name: string }, b: { name: string }) =>
     a.name.localeCompare(b.name, 'zh-CN')
   const level1 = (categories ?? []).filter((c) => !c.parentId).sort(bySort)
+  // 语言与购票渠道：按拼音首字母排序（zh-CN 的 localeCompare 即按拼音）
+  const languagesSorted = [...(languages ?? [])].sort(byName)
+  const channelsSorted = [...(channels ?? [])].sort(byName)
   const level2ByParent = useMemo(() => {
     const map = new Map<string, Category[]>()
     for (const c of categories ?? []) {
@@ -265,6 +307,7 @@ export default function ShowsPage() {
     const citySet = new Set(cityIds)
     const venueSet = new Set(venueIds)
     const yearSet = new Set(years)
+    const monthSet = new Set(months)
     const languageSet = new Set(languageIds)
     const channelSet = new Set(channelIds)
     // 评分：'none' 表示未评分；其余为半星档位，按「及以上」或「精确」匹配
@@ -282,7 +325,19 @@ export default function ShowsPage() {
       if (citySet.size > 0 || venueSet.size > 0) {
         if (!citySet.has(s.cityId) && !venueSet.has(s.venueId)) return false
       }
-      if (yearSet.size > 0 && !yearSet.has(s.date.slice(0, 4))) return false
+      // 时间：年份与月份合并为一组，组内任一匹配（勾年份 = 涵盖该年有演出的全部月份）
+      if (yearSet.size > 0 || monthSet.size > 0) {
+        if (!yearSet.has(s.date.slice(0, 4)) && !monthSet.has(s.date.slice(0, 7))) return false
+      }
+      // 价格：按人民币实付价区间（含上下限）；未填价格的记录默认排除，可用抽屉里的开关一并包含
+      if (priceMin != null || priceMax != null) {
+        if (s.paidPrice == null) {
+          if (!includeUnpriced) return false
+        } else {
+          if (priceMin != null && s.paidPrice < priceMin) return false
+          if (priceMax != null && s.paidPrice > priceMax) return false
+        }
+      }
       if (languageSet.size > 0 && !(s.languageId != null && languageSet.has(s.languageId)))
         return false
       if (channelSet.size > 0 && !(s.ticketChannelId != null && channelSet.has(s.ticketChannelId)))
@@ -309,6 +364,10 @@ export default function ShowsPage() {
         s.review,
         s.notes,
         s.date,
+        s.faceForeignAmount != null ? String(s.faceForeignAmount) : '',
+        s.paidForeignAmount != null ? String(s.paidForeignAmount) : '',
+        s.faceForeignCurrency,
+        s.paidForeignCurrency,
         cityName(s.cityId),
         venueName(s.venueId),
         showCategoryName(s),
@@ -329,6 +388,10 @@ export default function ShowsPage() {
     cityIds,
     venueIds,
     years,
+    months,
+    priceMin,
+    priceMax,
+    includeUnpriced,
     ratingLevels,
     ratingMode,
     languageIds,
@@ -352,13 +415,25 @@ export default function ShowsPage() {
 
   const dayShows = selectedDate ? filtered.filter((s) => s.date === selectedDate) : []
 
-  const yearOptions = useMemo(() => {
-    const set = new Set<string>()
+  /**
+   * 时间筛选的树：年份父级（从新到旧）→ 该年「有演出」的月份子级（从小到大）。
+   * 只列出真的存在演出记录的月份，空月份不出现。
+   */
+  const monthsByYear = useMemo(() => {
+    const map = new Map<string, Set<string>>()
     for (const s of shows ?? []) {
       const y = s.date.slice(0, 4)
-      if (y) set.add(y)
+      if (!y) continue
+      const set = map.get(y) ?? new Set<string>()
+      const m = s.date.slice(0, 7)
+      if (m.length === 7) set.add(m)
+      map.set(y, set)
     }
-    return [...set].sort((a, b) => (a < b ? 1 : a > b ? -1 : 0))
+    return new Map(
+      [...map.entries()]
+        .sort((a, b) => (a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0))
+        .map(([y, set]) => [y, [...set].sort()] as [string, string[]])
+    )
   }, [shows])
 
   /** 月历年份下拉的候选年份：演出数据覆盖的区间（含今年与当前正在浏览的年份），从新到旧。 */
@@ -390,11 +465,92 @@ export default function ShowsPage() {
     const checked = kids.filter((v) => venueIds.includes(v.id)).length
     return checked > 0 && checked < kids.length
   }).length
+  const timePartialCount = [...monthsByYear.values()].filter((list) => {
+    const checked = list.filter((m) => months.includes(m)).length
+    return checked > 0 && checked < list.length
+  }).length
+
+  // 价格筛选：滑块上限取数据里最高实付价向上取整到 500 的倍数（至少 2000，保证快捷档位够用）
+  const priceSliderMax = useMemo(() => {
+    let maxPaid = 0
+    for (const s of shows ?? []) {
+      if (s.paidPrice != null && s.paidPrice > maxPaid) maxPaid = s.paidPrice
+    }
+    return Math.max(2000, Math.ceil(maxPaid / 500) * 500)
+  }, [shows])
+  const priceActive = priceMin != null || priceMax != null
+  const [dragKnob, setDragKnob] = useState<'min' | 'max' | null>(null)
+  const priceRangeRef = useRef<HTMLDivElement | null>(null)
+  const sliderMinValue = Math.min(priceMin ?? 0, priceSliderMax)
+  const sliderMaxValue = Math.min(priceMax ?? priceSliderMax, priceSliderMax)
+  const sliderMinPct = (sliderMinValue / priceSliderMax) * 100
+  const sliderMaxPct = (sliderMaxValue / priceSliderMax) * 100
+  const unpricedCount = (shows ?? []).filter((s) => s.paidPrice == null).length
+  const priceRangeText = priceActive
+    ? `${formatMoney(sliderMinValue)} — ${
+        priceMax == null ? `¥${priceSliderMax.toLocaleString('zh-CN')}+` : formatMoney(priceMax)
+      }`
+    : `¥0 — ¥${priceSliderMax.toLocaleString('zh-CN')}+`
+
+  function applyPriceRange(min: number | null, max: number | null) {
+    setPriceMin(min)
+    setPriceMax(max)
+  }
+
+  /** 拖动滑块：两侧互相约束，至少留出 1 元间距。 */
+  function handlePriceSlider(which: 'min' | 'max', raw: number) {
+    if (which === 'min') setPriceMin(Math.max(0, Math.min(raw, sliderMaxValue - PRICE_STEP)))
+    else setPriceMax(Math.max(sliderMinValue + PRICE_STEP, Math.min(raw, priceSliderMax)))
+  }
+
+  /** 自绘双滑块：按下位置靠近哪个滑块就拖哪个，点空白处直接跳转。 */
+  function priceValueFromX(clientX: number): number {
+    const el = priceRangeRef.current
+    if (!el) return 0
+    const rect = el.getBoundingClientRect()
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
+    return Math.round((ratio * priceSliderMax) / PRICE_STEP) * PRICE_STEP
+  }
+
+  function handleRangeDown(e: React.PointerEvent<HTMLDivElement>) {
+    const value = priceValueFromX(e.clientX)
+    const which =
+      Math.abs(value - sliderMinValue) <= Math.abs(value - sliderMaxValue) ? 'min' : 'max'
+    setDragKnob(which)
+    e.currentTarget.setPointerCapture(e.pointerId)
+    handlePriceSlider(which, value)
+  }
+
+  function handleRangeMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!dragKnob) return
+    handlePriceSlider(dragKnob, priceValueFromX(e.clientX))
+  }
+
+  function handleRangeUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    }
+    setDragKnob(null)
+  }
+
+  function handlePriceInput(which: 'min' | 'max', raw: string) {
+    if (raw.trim() === '') {
+      if (which === 'min') setPriceMin(null)
+      else setPriceMax(null)
+      return
+    }
+    const value = Number(raw)
+    if (!Number.isFinite(value)) return
+    const next = Math.max(0, value)
+    if (which === 'min') setPriceMin(next)
+    else setPriceMax(next)
+  }
   const tabCounts: Record<FilterTab, number> = {
     status: statuses.length,
     category: cat1Ids.length + catPartialCount,
     place: cityIds.length + cityPartialCount,
-    year: years.length,
+    time: years.length + timePartialCount,
+    price: priceMin != null || priceMax != null ? 1 : 0,
     rating: ratingLevels.length,
     language: languageIds.length,
     channel: channelIds.length
@@ -433,6 +589,10 @@ export default function ShowsPage() {
     setLanguageIds([])
     setChannelIds([])
     setYears([])
+    setMonths([])
+    setPriceMin(null)
+    setPriceMax(null)
+    setIncludeUnpriced(false)
     setRatingLevels([])
   }
 
@@ -472,6 +632,25 @@ export default function ShowsPage() {
     setVenueIds(next)
     const allChecked = kids.length > 0 && kids.every((k) => next.includes(k))
     setCityIds((prev) => toggleIn(prev, cityId, allChecked))
+  }
+
+  // 勾选年份 → 同步勾选该年有演出的全部月份；取消则同步取消
+  function toggleYear(yearKey: string, on: boolean) {
+    const kids = monthsByYear.get(yearKey) ?? []
+    setYears((prev) => toggleIn(prev, yearKey, on))
+    if (kids.length === 0) return
+    setMonths((prev) =>
+      on ? [...new Set([...prev, ...kids])] : prev.filter((v) => !kids.includes(v))
+    )
+  }
+
+  // 勾选月份：该年有演出的月份全部勾上时父级自动全选，部分勾选时父级为半选
+  function toggleMonth(yearKey: string, monthKey: string, on: boolean) {
+    const kids = monthsByYear.get(yearKey) ?? []
+    const next = toggleIn(months, monthKey, on)
+    setMonths(next)
+    const allChecked = kids.length > 0 && kids.every((k) => next.includes(k))
+    setYears((prev) => toggleIn(prev, yearKey, allChecked))
   }
 
   function MiniPoster({ show }: { show: Show }) {
@@ -994,19 +1173,176 @@ export default function ShowsPage() {
                   </>
                 )}
 
-                {filterTab === 'year' && (
+                {filterTab === 'time' && (
                   <>
-                    <p className="filter-panel-hint">可同时勾选多个年份</p>
-                    {yearOptions.map((y) => (
-                      <label key={y} className="filter-item">
-                        <span>{y} 年</span>
-                        <TriCheckbox
-                          checked={years.includes(y)}
-                          indeterminate={false}
-                          onChange={(on) => setYears((prev) => toggleIn(prev, y, on))}
+                    <p className="filter-panel-hint">勾选年份 = 涵盖该年有演出的全部月份</p>
+                    {monthsByYear.size === 0 && (
+                      <p className="filter-panel-empty">还没有演出记录，暂无时间可筛选</p>
+                    )}
+                    {[...monthsByYear.entries()].map(([yearKey, monthList]) => {
+                      const checkedCount = monthList.filter((m) => months.includes(m)).length
+                      const allChecked =
+                        monthList.length > 0
+                          ? checkedCount === monthList.length
+                          : years.includes(yearKey)
+                      const partial = checkedCount > 0 && checkedCount < monthList.length
+                      const open = isParentExpanded(yearKey, checkedCount > 0)
+                      return (
+                        <Fragment key={yearKey}>
+                          <label className="filter-item parent">
+                            {monthList.length > 0 ? (
+                              <button
+                                type="button"
+                                className={`filter-expand${open ? ' open' : ''}`}
+                                aria-label={open ? '收起' : '展开'}
+                                aria-expanded={open}
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  toggleParentExpanded(yearKey, open)
+                                }}
+                              >
+                                ›
+                              </button>
+                            ) : (
+                              <span className="filter-expand filter-expand-empty" />
+                            )}
+                            <span className="filter-parent-name">{yearKey} 年</span>
+                            <TriCheckbox
+                              checked={allChecked}
+                              indeterminate={partial}
+                              onChange={(on) => toggleYear(yearKey, on)}
+                            />
+                          </label>
+                          {open && monthList.map((monthKey) => (
+                            <label key={monthKey} className="filter-item child">
+                              <span>{Number(monthKey.slice(5))} 月</span>
+                              <TriCheckbox
+                                checked={months.includes(monthKey)}
+                                indeterminate={false}
+                                onChange={(on) => toggleMonth(yearKey, monthKey, on)}
+                              />
+                            </label>
+                          ))}
+                        </Fragment>
+                      )
+                    })}
+                  </>
+                )}
+
+                {filterTab === 'price' && (
+                  <>
+                    <p className="filter-panel-hint">按人民币实付价格筛选；未填价格的记录默认不参与</p>
+                    <p className={`price-range-readout${priceActive ? '' : ' idle'}`}>
+                      {priceRangeText}
+                    </p>
+                    <div
+                      className={`price-range${dragKnob ? ' dragging' : ''}`}
+                      ref={priceRangeRef}
+                      onPointerDown={handleRangeDown}
+                      onPointerMove={handleRangeMove}
+                      onPointerUp={handleRangeUp}
+                      onPointerCancel={handleRangeUp}
+                    >
+                      <span className="price-range-track" />
+                      <span
+                        className="price-range-fill"
+                        style={{ left: `${sliderMinPct}%`, right: `${100 - sliderMaxPct}%` }}
+                      />
+                      <span
+                        role="slider"
+                        tabIndex={0}
+                        aria-label="最低实付价"
+                        aria-valuemin={0}
+                        aria-valuemax={priceSliderMax}
+                        aria-valuenow={sliderMinValue}
+                        className="price-range-knob"
+                        style={{ left: `${sliderMinPct}%` }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+                            e.preventDefault()
+                            handlePriceSlider('min', sliderMinValue - PRICE_STEP)
+                          } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                            e.preventDefault()
+                            handlePriceSlider('min', sliderMinValue + PRICE_STEP)
+                          }
+                        }}
+                      />
+                      <span
+                        role="slider"
+                        tabIndex={0}
+                        aria-label="最高实付价"
+                        aria-valuemin={0}
+                        aria-valuemax={priceSliderMax}
+                        aria-valuenow={sliderMaxValue}
+                        className="price-range-knob"
+                        style={{ left: `${sliderMaxPct}%` }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+                            e.preventDefault()
+                            handlePriceSlider('max', sliderMaxValue - PRICE_STEP)
+                          } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                            e.preventDefault()
+                            handlePriceSlider('max', sliderMaxValue + PRICE_STEP)
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="price-inputs">
+                      <label className="price-input">
+                        <span>¥</span>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          value={priceMin ?? ''}
+                          placeholder="最低"
+                          aria-label="最低实付价（输入）"
+                          onChange={(e) => handlePriceInput('min', e.target.value)}
                         />
                       </label>
-                    ))}
+                      <label className="price-input">
+                        <span>¥</span>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          value={priceMax ?? ''}
+                          placeholder="最高"
+                          aria-label="最高实付价（输入）"
+                          onChange={(e) => handlePriceInput('max', e.target.value)}
+                        />
+                      </label>
+                    </div>
+                    <div className="price-presets">
+                      {PRICE_PRESETS.map((preset) => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          className={`price-preset${
+                            priceMin === preset.min && priceMax === preset.max ? ' on' : ''
+                          }`}
+                          onClick={() => applyPriceRange(preset.min, preset.max)}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                    <label className="price-toggle">
+                      <span>
+                        包含未填价格的记录
+                        <small>
+                          {includeUnpriced
+                            ? `已开启：${unpricedCount} 场未填价格的记录也会一起显示`
+                            : `默认关闭：${unpricedCount} 场未填价格的记录会被排除`}
+                        </small>
+                      </span>
+                      <TriCheckbox
+                        checked={includeUnpriced}
+                        indeterminate={false}
+                        onChange={(on) => setIncludeUnpriced(on)}
+                      />
+                    </label>
                   </>
                 )}
 
@@ -1060,10 +1396,10 @@ export default function ShowsPage() {
                 {filterTab === 'language' && (
                   <>
                     <p className="filter-panel-hint">可同时勾选多种语言</p>
-                    {(languages ?? []).length === 0 && (
+                    {languagesSorted.length === 0 && (
                       <p className="filter-panel-empty">还没有语言，可在设置中添加</p>
                     )}
-                    {(languages ?? []).map((item) => (
+                    {languagesSorted.map((item) => (
                       <label key={item.id} className="filter-item">
                         <span>{item.name}</span>
                         <TriCheckbox
@@ -1079,10 +1415,10 @@ export default function ShowsPage() {
                 {filterTab === 'channel' && (
                   <>
                     <p className="filter-panel-hint">可同时勾选多个渠道</p>
-                    {(channels ?? []).length === 0 && (
+                    {channelsSorted.length === 0 && (
                       <p className="filter-panel-empty">还没有购票渠道，可在设置中添加</p>
                     )}
-                    {(channels ?? []).map((item) => (
+                    {channelsSorted.map((item) => (
                       <label key={item.id} className="filter-item">
                         <span>{item.name}</span>
                         <TriCheckbox

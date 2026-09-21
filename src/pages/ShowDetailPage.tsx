@@ -8,7 +8,13 @@ import { ImagePreview } from '../components/ImagePreview'
 import { Lightbox } from '../components/Lightbox'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
-import { formatFullDate, formatMoney } from '../lib/format'
+import {
+  formatFullDate,
+  formatMoney,
+  formatMoneyWithForeign,
+  formatRatio,
+  paidRatio
+} from '../lib/format'
 import type { ImageAsset } from '../types'
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -63,6 +69,20 @@ export default function ShowDetailPage() {
     () => new Map((channels ?? []).map((c) => [c.id, c.name])),
     [channels]
   )
+
+  // 价格摘要条（方案三）：票面与实付都能算出结果时才展示
+  const priceSummary = useMemo(() => {
+    const face = show?.faceValue
+    const paid = show?.paidPrice
+    if (face == null || paid == null || face <= 0) return null
+    const diff = paid - face
+    const ratio = paidRatio(paid, face)
+    return {
+      diffText: diff === 0 ? '原价' : `${diff > 0 ? '溢价' : '折扣'} ${formatMoney(Math.abs(diff))}`,
+      ratioText: formatRatio(ratio),
+      tone: diff > 0 ? 'over' : diff < 0 ? 'under' : ''
+    }
+  }, [show?.faceValue, show?.paidPrice])
 
   if (!show) {
     return (
@@ -173,10 +193,40 @@ export default function ShowDetailPage() {
         <div className="detail-rows">
           {channelName && <Row label="购票渠道" value={channelName} />}
           {show.seat && <Row label="座位号" value={show.seat} />}
-          <Row label="票面价格" value={formatMoney(show.faceValue)} />
-          <Row label="实付价格" value={formatMoney(show.paidPrice)} />
+          <Row
+            label="票面价格"
+            value={formatMoneyWithForeign(
+              show.faceValue,
+              show.faceForeignAmount,
+              show.faceForeignCurrency
+            )}
+          />
+          <Row
+            label="实付价格"
+            value={formatMoneyWithForeign(
+              show.paidPrice,
+              show.paidForeignAmount,
+              show.paidForeignCurrency
+            )}
+          />
           {show.cast && <Row label="演出阵容" value={show.cast} />}
         </div>
+        {priceSummary && (
+          <div className={`calc-bar${priceSummary.tone ? ` calc-bar-${priceSummary.tone}` : ''}`}>
+            <div className="calc-col">
+              <span className="calc-label">差价</span>
+              <span className={`calc-value${priceSummary.tone ? ` calc-${priceSummary.tone}` : ''}`}>
+                {priceSummary.diffText}
+              </span>
+            </div>
+            <div className="calc-col">
+              <span className="calc-label">实付率</span>
+              <span className={`calc-value${priceSummary.tone ? ` calc-${priceSummary.tone}` : ''}`}>
+                {priceSummary.ratioText}
+              </span>
+            </div>
+          </div>
+        )}
       </section>
 
       {(show.rating != null || show.review) && (
