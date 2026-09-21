@@ -40,6 +40,10 @@ export interface ShowPayload {
   posterCrop?: Show['posterCrop']
   faceValue?: number
   paidPrice?: number
+  faceForeignAmount?: number
+  faceForeignCurrency?: string
+  paidForeignAmount?: number
+  paidForeignCurrency?: string
   rating?: number
   review?: string
   notes?: string
@@ -70,6 +74,10 @@ export async function saveShow(input: ShowPayload, opts: { publish: boolean }): 
     posterCrop: input.posterCrop,
     faceValue: input.faceValue,
     paidPrice: input.paidPrice,
+    faceForeignAmount: input.faceForeignAmount,
+    faceForeignCurrency: input.faceForeignCurrency,
+    paidForeignAmount: input.paidForeignAmount,
+    paidForeignCurrency: input.paidForeignCurrency,
     rating: input.rating,
     review: input.review,
     notes: input.notes,
@@ -102,6 +110,10 @@ export async function updateShow(id: string, input: ShowPayload, opts: { publish
     ticketChannelId: input.ticketChannelId,
     faceValue: input.faceValue,
     paidPrice: input.paidPrice,
+    faceForeignAmount: input.faceForeignAmount,
+    faceForeignCurrency: input.faceForeignCurrency,
+    paidForeignAmount: input.paidForeignAmount,
+    paidForeignCurrency: input.paidForeignCurrency,
     rating: input.rating,
     review: input.review,
     notes: input.notes,
