@@ -2173,6 +2173,120 @@ a {
   margin-top: 6px;
 }
 
+/* ---------- 价格与外币（票务分节） ---------- */
+
+/* 人民币 + 外币两列并排；窄屏也保持两列 */
+.price-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 var(--space-3);
+}
+
+.price-grid .field {
+  margin-bottom: var(--space-3);
+}
+
+.fx-pair {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fx-pair .input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 币种选择：收起时只显示三位代码 */
+.select-currency {
+  flex-shrink: 0;
+  width: auto;
+}
+
+.select-currency .select-trigger {
+  width: auto;
+  min-height: 46px;
+  padding: 11px 10px;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.04em;
+}
+
+.select-currency .select-chevron {
+  width: 12px;
+  height: 12px;
+}
+
+.select-currency .select-pop {
+  left: auto;
+  right: 0;
+  width: 168px;
+}
+
+.field-note {
+  margin: -2px 0 var(--space-4);
+  font-size: var(--fs-sm);
+  color: var(--color-text-2);
+}
+
+.field-note-warn {
+  color: var(--color-danger);
+}
+
+/* 差价 / 实付率：标签同一行，数值同一行 */
+.calc-bar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: 12px 14px;
+  border: 1px solid var(--color-line-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.calc-bar-over {
+  border-color: var(--color-danger-border);
+  background: rgba(216, 120, 106, 0.08);
+}
+
+.calc-bar-under {
+  border-color: var(--color-ok-border);
+  background: rgba(155, 191, 159, 0.08);
+}
+
+.calc-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.calc-label {
+  font-size: var(--fs-sm);
+  color: var(--color-text-2);
+}
+
+.calc-value {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--color-text-0);
+}
+
+.calc-over {
+  color: var(--color-danger);
+}
+
+.calc-under {
+  color: var(--color-ok);
+}
+
+.detail-rows + .calc-bar {
+  margin-top: var(--space-4);
+}
+
 .form-actions {
   /* 与导航栏一样固定定位：不随滚动容器移动，始终停在胶囊上方 24px */
   position: fixed;
@@ -2432,6 +2546,23 @@ a {
   margin: var(--space-1) 0 0;
   font-size: var(--fs-sm);
   color: var(--color-text-2);
+}
+
+/* 概览卡片里的一行小字（如「实付率 112.4%」） */
+.stat-sub {
+  margin: 2px 0 0;
+  font-size: var(--fs-xs);
+  color: var(--color-amber);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.data-table .num-over {
+  color: var(--color-danger);
+}
+
+.data-table .num-under {
+  color: var(--color-ok);
 }
 
 .settings-list {
@@ -3767,6 +3898,165 @@ td.pivot-lv {
 }
 
 .filter-item input[type='checkbox'] {
+  flex-shrink: 0;
+  width: 17px;
+  height: 17px;
+  accent-color: var(--color-amber);
+  cursor: pointer;
+}
+
+/* ---------- 价格筛选（抽屉右列） ---------- */
+
+.price-range-readout {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--color-amber);
+  font-variant-numeric: tabular-nums;
+}
+
+.price-range-readout.idle {
+  font-size: var(--fs-md);
+  color: var(--color-text-2);
+}
+
+.price-range {
+  position: relative;
+  height: 34px;
+  margin: 8px 2px 0;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.price-range-track {
+  position: absolute;
+  top: 15px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-surface-strong);
+}
+
+.price-range-fill {
+  position: absolute;
+  top: 15px;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--color-amber-grad-a), var(--color-amber-grad-b));
+}
+
+/* 自绘滑块：按下轨道即拖动最近的一个滑块 */
+.price-range-knob {
+  position: absolute;
+  top: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--color-amber);
+  background: var(--color-text-0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  transform: translateX(-50%);
+  cursor: grab;
+}
+
+.price-range.dragging .price-range-knob {
+  cursor: grabbing;
+}
+
+.price-range-knob:focus-visible {
+  outline: 2px solid var(--color-amber);
+  outline-offset: 2px;
+}
+
+.price-range.dragging .price-range-knob {
+  transform: translateX(-50%) scale(1.08);
+}
+
+.price-inputs {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.price-input {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-input-bg);
+  color: var(--color-text-1);
+  font-size: var(--fs-sm);
+}
+
+.price-input:focus-within {
+  border-color: var(--color-amber);
+}
+
+.price-input input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-0);
+  font: inherit;
+}
+
+.price-input input:focus {
+  outline: none;
+}
+
+.price-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--space-3);
+}
+
+.price-preset {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 15px;
+  background: var(--color-surface);
+  color: var(--color-text-1);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.price-preset.on {
+  border-color: var(--color-amber-border);
+  background: var(--color-amber-soft);
+  color: var(--color-amber);
+}
+
+.price-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-line-faint);
+  font-size: var(--fs-sm);
+  color: var(--color-text-1);
+}
+
+.price-toggle small {
+  display: block;
+  margin-top: 3px;
+  font-size: var(--fs-xs);
+  color: var(--color-text-2);
+}
+
+.price-toggle input[type='checkbox'] {
   flex-shrink: 0;
   width: 17px;
   height: 17px;
