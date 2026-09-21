@@ -16,7 +16,8 @@ export function Select({
   disabled,
   ariaLabel,
   id,
-  className
+  className,
+  triggerLabel
 }: {
   value: string
   onChange: (value: string) => void
@@ -26,6 +27,8 @@ export function Select({
   ariaLabel?: string
   id?: string
   className?: string
+  /** 覆盖收起状态显示的文字（例如币种只显示三位代码，展开列表仍显示完整名称） */
+  triggerLabel?: string
 }) {
   const [open, setOpen] = useState(false)
   const [highlight, setHighlight] = useState(-1)
@@ -33,7 +36,7 @@ export function Select({
   const listRef = useRef<HTMLDivElement | null>(null)
 
   const selected = options.find((o) => o.value === value)
-  const label = selected ? selected.label : placeholder
+  const label = triggerLabel ?? (selected ? selected.label : placeholder)
 
   useEffect(() => {
     if (!open) return

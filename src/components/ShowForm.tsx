@@ -18,6 +18,10 @@ import { ImagePreview } from './ImagePreview'
 import { Select } from './Select'
 import { DatePicker } from './DatePicker'
 import { TimePicker } from './TimePicker'
+import { CURRENCIES, formatMoney, formatRatio, paidRatio } from '../lib/format'
+
+/** 外币币种下拉项：收起时只显示三位代码，展开列表里带中文名。 */
+const CURRENCY_OPTIONS = CURRENCIES.map((c) => ({ value: c.code, label: `${c.name} ${c.code}` }))
 import { PosterCropEditor } from './PosterCropEditor'
 import { PosterThumb } from './PosterThumb'
 import { useToast } from './Toast'
@@ -44,6 +48,10 @@ interface FormState {
   content: string
   faceValue: string
   paidPrice: string
+  faceForeignAmount: string
+  faceForeignCurrency: string
+  paidForeignAmount: string
+  paidForeignCurrency: string
   rating: number | null
   review: string
   notes: string
@@ -89,6 +97,10 @@ function initialForm(): FormState {
     content: '',
     faceValue: '',
     paidPrice: '',
+    faceForeignAmount: '',
+    faceForeignCurrency: 'HKD',
+    paidForeignAmount: '',
+    paidForeignCurrency: 'HKD',
     rating: null,
     review: '',
     notes: '',
@@ -123,6 +135,10 @@ function formFromShow(show: Show): FormState {
     content: show.content ?? '',
     faceValue: show.faceValue != null ? String(show.faceValue) : '',
     paidPrice: show.paidPrice != null ? String(show.paidPrice) : '',
+    faceForeignAmount: show.faceForeignAmount != null ? String(show.faceForeignAmount) : '',
+    faceForeignCurrency: show.faceForeignCurrency ?? 'HKD',
+    paidForeignAmount: show.paidForeignAmount != null ? String(show.paidForeignAmount) : '',
+    paidForeignCurrency: show.paidForeignCurrency ?? 'HKD',
     rating: show.rating ?? null,
     review: show.review ?? '',
     notes: show.notes ?? '',
@@ -362,6 +378,24 @@ export function ShowForm({
   const level2 = (categories ?? []).filter((c) => c.parentId === form.categoryLevel1Id).sort(bySort)
   const cityVenues = (venues ?? []).filter((v) => v.cityId === form.cityId).sort(byName)
 
+  // 实时价格计算：差价 = 实付 − 票面；实付率 = 实付 ÷ 票面（1 位小数）
+  const faceValueNum = form.faceValue ? Number(form.faceValue) : undefined
+  const paidPriceNum = form.paidPrice ? Number(form.paidPrice) : undefined
+  const priceDiff =
+    faceValueNum != null && faceValueNum > 0 && paidPriceNum != null
+      ? paidPriceNum - faceValueNum
+      : null
+  const priceRatio = paidRatio(paidPriceNum, faceValueNum)
+  const priceTone = priceDiff == null ? '' : priceDiff > 0 ? 'over' : priceDiff < 0 ? 'under' : ''
+  const diffText =
+    priceDiff == null
+      ? '—'
+      : priceDiff === 0
+        ? '原价'
+        : `${priceDiff > 0 ? '溢价' : '折扣'} ${formatMoney(Math.abs(priceDiff))}`
+  const ratioText = formatRatio(priceRatio)
+  const paidForeignOnly = form.paidForeignAmount !== '' && form.paidPrice === ''
+
   useEffect(() => {
     if (mode !== 'edit' || !initial || initializedRef.current) return
     setForm(formFromShow(initial))
@@ -524,6 +558,10 @@ export function ShowForm({
           ticketChannelId: form.ticketChannelId || undefined,
           faceValue: form.faceValue ? Number(form.faceValue) : undefined,
           paidPrice: form.paidPrice ? Number(form.paidPrice) : undefined,
+          faceForeignAmount: form.faceForeignAmount ? Number(form.faceForeignAmount) : undefined,
+          faceForeignCurrency: form.faceForeignAmount ? form.faceForeignCurrency : undefined,
+          paidForeignAmount: form.paidForeignAmount ? Number(form.paidForeignAmount) : undefined,
+          paidForeignCurrency: form.paidForeignAmount ? form.paidForeignCurrency : undefined,
           rating: form.rating ?? undefined,
           review: form.review,
           notes: form.notes,
@@ -800,7 +838,7 @@ export function ShowForm({
 
         <section className="form-section">
           <SectionTitle kicker="Tickets">票务</SectionTitle>
-          <div className="form-grid">
+          <div className="price-grid">
             <div className="field">
               <label htmlFor="face">票面价格（元）</label>
               <input
@@ -816,6 +854,30 @@ export function ShowForm({
               />
             </div>
             <div className="field">
+              <label htmlFor="faceFx">外币票面</label>
+              <div className="fx-pair">
+                <input
+                  id="faceFx"
+                  className="input"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  value={form.faceForeignAmount}
+                  onChange={(e) => setField('faceForeignAmount', e.target.value)}
+                  placeholder="金额"
+                />
+                <Select
+                  className="select-currency"
+                  triggerLabel={form.faceForeignCurrency}
+                  value={form.faceForeignCurrency}
+                  onChange={(v) => setField('faceForeignCurrency', v)}
+                  options={CURRENCY_OPTIONS}
+                  ariaLabel="外币票面币种"
+                />
+              </div>
+            </div>
+            <div className="field">
               <label htmlFor="paid">实付价格（元）</label>
               <input
                 id="paid"
@@ -829,6 +891,48 @@ export function ShowForm({
                 placeholder="仅填写数字"
               />
             </div>
+            <div className="field">
+              <label htmlFor="paidFx">外币实付</label>
+              <div className="fx-pair">
+                <input
+                  id="paidFx"
+                  className="input"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  value={form.paidForeignAmount}
+                  onChange={(e) => setField('paidForeignAmount', e.target.value)}
+                  placeholder="金额"
+                />
+                <Select
+                  className="select-currency"
+                  triggerLabel={form.paidForeignCurrency}
+                  value={form.paidForeignCurrency}
+                  onChange={(v) => setField('paidForeignCurrency', v)}
+                  options={CURRENCY_OPTIONS}
+                  ariaLabel="外币实付币种"
+                />
+              </div>
+            </div>
+          </div>
+          <p className="field-note">外币只作记录，币种可选 港币 / 澳门元 / 日元 / 韩元</p>
+          {paidForeignOnly && (
+            <p className="field-note field-note-warn">
+              未填人民币实付金额，本条不计入统计页的总花费与实付率
+            </p>
+          )}
+          <div className={`calc-bar${priceTone ? ` calc-bar-${priceTone}` : ''}`}>
+            <div className="calc-col">
+              <span className="calc-label">差价</span>
+              <span className={`calc-value${priceTone ? ` calc-${priceTone}` : ''}`}>{diffText}</span>
+            </div>
+            <div className="calc-col">
+              <span className="calc-label">实付率</span>
+              <span className={`calc-value${priceTone ? ` calc-${priceTone}` : ''}`}>{ratioText}</span>
+            </div>
+          </div>
+          <div className="form-grid">
             <EntityPicker
               label="购票渠道"
               htmlId="channel"
