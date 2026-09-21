@@ -42,6 +42,10 @@ export interface ExportedShow {
   ticketChannelId?: string
   faceValue?: number
   paidPrice?: number
+  faceForeignAmount?: number
+  faceForeignCurrency?: string
+  paidForeignAmount?: number
+  paidForeignCurrency?: string
   rating?: number
   review?: string
   notes?: string
@@ -158,6 +162,10 @@ export async function gatherExportData(): Promise<ExportResult> {
       ticketChannelId: show.ticketChannelId,
       faceValue: show.faceValue,
       paidPrice: show.paidPrice,
+      faceForeignAmount: show.faceForeignAmount,
+      faceForeignCurrency: show.faceForeignCurrency,
+      paidForeignAmount: show.paidForeignAmount,
+      paidForeignCurrency: show.paidForeignCurrency,
       rating: show.rating,
       review: show.review,
       notes: show.notes,
@@ -328,6 +336,10 @@ async function exportedShowToShow(parsed: ParsedArchive, s: ExportedShow): Promi
     ticketChannelId: s.ticketChannelId,
     faceValue: s.faceValue,
     paidPrice: s.paidPrice,
+    faceForeignAmount: s.faceForeignAmount,
+    faceForeignCurrency: s.faceForeignCurrency,
+    paidForeignAmount: s.paidForeignAmount,
+    paidForeignCurrency: s.paidForeignCurrency,
     rating: s.rating,
     review: s.review,
     notes: s.notes,
