@@ -4044,7 +4044,8 @@ td.pivot-lv {
   gap: var(--space-3);
   margin-top: var(--space-3);
   padding-top: var(--space-3);
-  border-top: 1px solid var(--color-line-faint);
+  /* 与其他筛选组一致的分隔线：虚线，位于这一行上方 */
+  border-top: 1px dashed var(--color-line-soft);
   font-size: var(--fs-sm);
   color: var(--color-text-1);
 }
