@@ -46,6 +46,12 @@ export interface Show {
   ticketChannelId?: string
   faceValue?: number
   paidPrice?: number
+  /** 外币票面金额与币种代码（仅作记录，不参与换算、实付率与统计口径） */
+  faceForeignAmount?: number
+  faceForeignCurrency?: string
+  /** 外币实付金额与币种代码（仅作记录） */
+  paidForeignAmount?: number
+  paidForeignCurrency?: string
   ticketImage?: ImageAsset
   seatViewImage?: ImageAsset
   rating?: number
