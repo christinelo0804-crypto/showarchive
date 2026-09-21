@@ -28,6 +28,83 @@ const DIM_KEYS: PivotDimKey[] = [
 const MAX_DIMS = 3
 const PIE_MAX = 8
 const STACK_MAX = 4
+/** 图例字号与单条目估算（用于按容器宽度计算图例会占几行） */
+const LEGEND_FONT = 11
+const LEGEND_ITEM_GAP = 10
+/** 图例行高：ECharts 的纵向行距约为图标高(8) + itemGap(10) + 余量，实测约 22px */
+const LEGEND_ROW_H = 22
+
+let measureCtx: CanvasRenderingContext2D | null | undefined
+
+/** 用真实字体度量图例文字宽度（拿不到 canvas 时退化为按字符估算）。 */
+function measureLegendText(text: string): number {
+  if (measureCtx === undefined) {
+    measureCtx =
+      typeof document === 'undefined'
+        ? null
+        : document.createElement('canvas').getContext('2d')
+  }
+  if (!measureCtx) {
+    let fallback = 0
+    for (const ch of text) {
+      fallback += /[\u2e80-\u9fff\uff00-\uffef]/.test(ch) ? LEGEND_FONT : LEGEND_FONT * 0.75
+    }
+    return fallback
+  }
+  measureCtx.font = `${LEGEND_FONT}px -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif`
+  return measureCtx.measureText(text).width
+}
+
+/** 一个图例条目的总宽度：图标 + 图标与文字间距 + 文字 + 条目间距。 */
+function legendItemWidth(text: string): number {
+  // 乘 1.08 作为安全系数：不同设备/字体的实际字宽略有差异，宁可多留一行也不要压住图形
+  return 8 + 5 + measureLegendText(text) * 1.08 + LEGEND_ITEM_GAP
+}
+
+/** 按容器宽度估算图例会占几行（贪心换行，与 ECharts 行为近似）。 */
+function estimateLegendRows(items: string[], width: number): number {
+  const available = Math.max(120, width - 16)
+  let rows = 1
+  let lineWidth = 0
+  for (const item of items) {
+    const w = legendItemWidth(item)
+    if (lineWidth === 0) lineWidth = w
+    else if (lineWidth + w <= available) lineWidth += w
+    else {
+      rows += 1
+      lineWidth = w
+    }
+  }
+  return rows
+}
+
+/** 次级维度排名：按 |度量| 之和取前 STACK_MAX 个，其余归入「其他」。 */
+function rankSecondary(
+  pivot: PivotNode,
+  measure: PivotMeasure
+): { kept: string[]; dropped: string[] } {
+  const weight = new Map<string, number>()
+  for (const p of pivot.children) {
+    for (const c of p.children) {
+      weight.set(c.name, (weight.get(c.name) ?? 0) + Math.abs(measureValue(c, measure) ?? 0))
+    }
+  }
+  const sorted = [...weight.entries()].sort(
+    (a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-CN')
+  )
+  return {
+    kept: sorted.slice(0, STACK_MAX).map(([name]) => name),
+    dropped: sorted.slice(STACK_MAX).map(([name]) => name)
+  }
+}
+
+/** 图例的高度（含上下留白），用于给饼图让位。 */
+function legendHeightOf(rows: number): number {
+  return rows * LEGEND_ROW_H + 6
+}
+
+/** 饼图绘图区基准高度：图例占多少行都不压缩饼图本身。 */
+const PIE_BASE_HEIGHT = 250
 
 type ChartKind = 'bar' | 'line' | 'pie'
 
@@ -155,6 +232,8 @@ export default function StatsPage() {
   const [chartKind, setChartKind] = useState<ChartKind>('bar')
   const [overviewYear, setOverviewYear] = useState('all')
   const [pivotYear, setPivotYear] = useState('all')
+  // 图表容器宽度：图例会占几行取决于宽度，需要由 Chart 回报后再算布局
+  const [chartWidth, setChartWidth] = useState(358)
 
   const all = shows ?? []
   const yearOptions = useMemo(() => {
@@ -186,6 +265,28 @@ export default function StatsPage() {
 
   const kinds = availableChartKinds(dims, measure)
   const effectiveKind = kinds.includes(chartKind) ? chartKind : 'bar'
+
+  // 图例条目（与实际渲染保持一致）：饼图取扇区名，双维度取次级维度名
+  const legendItems = useMemo(() => {
+    if (dims.length === 0 || dims.length > 2) return []
+    if (effectiveKind === 'pie') {
+      const nodes = pivot.children
+      const names = nodes.slice(0, PIE_MAX).map((n) => n.name)
+      if (nodes.length > PIE_MAX) names.push('其他')
+      return names
+    }
+    if (dims.length === 2) {
+      const { kept, dropped } = rankSecondary(pivot, measure)
+      return dropped.length > 0 ? [...kept, '其他'] : kept
+    }
+    return []
+  }, [pivot, dims, measure, effectiveKind])
+  const legendRows = legendItems.length > 0 ? estimateLegendRows(legendItems, chartWidth) : 1
+  // 图例多一行就多给一行高度，绘图区不被压缩
+  const chartHeight =
+    effectiveKind === 'pie'
+      ? PIE_BASE_HEIGHT + legendHeightOf(legendRows)
+      : 280 + (legendRows - 1) * LEGEND_ROW_H
 
   function toggleDim(key: PivotDimKey) {
     setDims((prev) => {
@@ -236,19 +337,27 @@ export default function StatsPage() {
             itemStyle: { color: otherColor }
           })
         }
+        // D3：按图例行数加高图表，并把饼图圆心按「扣除图例后的高度」重新定位，避免图例压住饼图
+        const available = chartHeight - legendHeightOf(legendRows)
+        const outerRadius = Math.min(chartWidth, available) * 0.34
         return {
           backgroundColor: 'transparent',
           tooltip: { trigger: 'item', ...tooltipStyle },
           legend: {
+            data: data.map((d) => d.name),
             bottom: 0,
             icon: 'circle',
+            itemWidth: 8,
+            itemHeight: 8,
+            itemGap: LEGEND_ITEM_GAP,
+            padding: 0,
             textStyle: { color: isLight ? 'rgba(46,40,28,0.65)' : 'rgba(245,239,230,0.65)', fontSize: 11 }
           },
           series: [
             {
               type: 'pie',
-              radius: ['40%', '66%'],
-              center: ['50%', '44%'],
+              radius: [outerRadius * 0.6, outerRadius],
+              center: ['50%', available / 2],
               itemStyle: { borderColor: pieBorder, borderWidth: 2 },
               label: { color: isLight ? 'rgba(46,40,28,0.7)' : 'rgba(245,239,230,0.7)', fontSize: 11 },
               data
@@ -292,24 +401,12 @@ export default function StatsPage() {
 
     // 双维度：主维度为 X 轴，次级维度 Top N（超出部分归入「其他」）
     const primary = pivot.children
-    const secondaryMap = new Map<string, { name: string; weight: number }>()
-    for (const p of primary) {
-      for (const c of p.children) {
-        const cur = secondaryMap.get(c.name) ?? { name: c.name, weight: 0 }
-        // 用绝对值排序：差价可能为负（折扣），不能让折扣多的分类被排到末尾
-        cur.weight += Math.abs(nodeValue(c, measure) ?? 0)
-        secondaryMap.set(c.name, cur)
-      }
-    }
-    const sorted = [...secondaryMap.values()].sort(
-      (a, b) => b.weight - a.weight || a.name.localeCompare(b.name, 'zh-CN')
-    )
-    const kept = sorted.slice(0, STACK_MAX)
-    const dropped = sorted.slice(STACK_MAX)
-    const seriesDefs = kept.map((k) => ({ name: k.name, match: (c: PivotNode) => c.name === k.name }))
+    // 用绝对值排序：差价可能为负（折扣），不能让折扣多的分类被排到末尾
+    const { kept, dropped } = rankSecondary(pivot, measure)
+    const seriesDefs = kept.map((name) => ({ name, match: (c: PivotNode) => c.name === name }))
     if (dropped.length > 0) {
       // 只要有被截断的分类就必须补「其他」，否则它们会整类消失（差价为负时曾经如此）
-      const droppedNames = new Set(dropped.map((d) => d.name))
+      const droppedNames = new Set(dropped)
       seriesDefs.push({ name: '其他', match: (c: PivotNode) => droppedNames.has(c.name) })
     }
     // 只有可加的度量才堆叠；实付率 / 平均评分 / 差价用分组柱或折线，避免把比率相加
@@ -328,11 +425,17 @@ export default function StatsPage() {
 
     return {
       backgroundColor: 'transparent',
-      grid: commonGrid,
+      // 方案 A：图例占几行就往下让几行，图例不会压住绘图区
+      grid: { ...commonGrid, top: 8 + legendRows * LEGEND_ROW_H },
       tooltip,
       legend: {
+        data: seriesDefs.map((d) => d.name),
         top: 0,
         icon: 'circle',
+        itemWidth: 8,
+        itemHeight: 8,
+        itemGap: LEGEND_ITEM_GAP,
+        padding: 0,
         textStyle: { color: isLight ? 'rgba(46,40,28,0.65)' : 'rgba(245,239,230,0.65)', fontSize: 11 }
       },
       xAxis: {
@@ -350,7 +453,7 @@ export default function StatsPage() {
       },
       series
     }
-  }, [pivot, dims, measure, effectiveKind])
+  }, [pivot, dims, measure, effectiveKind, legendRows, chartHeight, chartWidth])
 
   const dimTitle = dims.map((d) => PIVOT_DIM_LABELS[d]).join(' × ')
   const chartTitle = dims.length ? `${dimTitle} · ${measureLabel(measure)}` : '透视分析'
@@ -544,7 +647,7 @@ export default function StatsPage() {
                           {dims.length === 2 && <span className="pivot-chart-note">次级维度 Top {STACK_MAX}</span>}
                         </span>
                       </div>
-                      <Chart option={chartOption} height={280} />
+                      <Chart option={chartOption} height={chartHeight} onWidth={setChartWidth} />
                     </div>
                   )}
                   <div className="pivot-table-wrap">

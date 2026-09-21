@@ -109,11 +109,13 @@ interface ShowsBrowseState {
   venueIds: string[]
   languageIds: string[]
   channelIds: string[]
+  languageUnset: boolean
+  channelUnset: boolean
   years: string[]
   months: string[]
   priceMin: number | null
   priceMax: number | null
-  includeUnpriced: boolean
+  priceUnset: boolean
   ratingLevels: string[]
   ratingMode: 'gte' | 'exact'
   year: number
@@ -146,11 +148,13 @@ export default function ShowsPage() {
   const [venueIds, setVenueIds] = useState<string[]>(cached?.venueIds ?? [])
   const [languageIds, setLanguageIds] = useState<string[]>(cached?.languageIds ?? [])
   const [channelIds, setChannelIds] = useState<string[]>(cached?.channelIds ?? [])
+  const [languageUnset, setLanguageUnset] = useState(cached?.languageUnset ?? false)
+  const [channelUnset, setChannelUnset] = useState(cached?.channelUnset ?? false)
   const [years, setYears] = useState<string[]>(cached?.years ?? [])
   const [months, setMonths] = useState<string[]>(cached?.months ?? [])
   const [priceMin, setPriceMin] = useState<number | null>(cached?.priceMin ?? null)
   const [priceMax, setPriceMax] = useState<number | null>(cached?.priceMax ?? null)
-  const [includeUnpriced, setIncludeUnpriced] = useState(cached?.includeUnpriced ?? false)
+  const [priceUnset, setPriceUnset] = useState(cached?.priceUnset ?? false)
   const [ratingLevels, setRatingLevels] = useState<string[]>(cached?.ratingLevels ?? [])
   const [ratingMode, setRatingMode] = useState<'gte' | 'exact'>(cached?.ratingMode ?? 'gte')
   // 父级展开状态（按 id 记录）；未手动设置过的父级，有勾选子级时默认展开
@@ -174,11 +178,13 @@ export default function ShowsPage() {
     venueIds,
     languageIds,
     channelIds,
+    languageUnset,
+    channelUnset,
     years,
     months,
     priceMin,
     priceMax,
-    includeUnpriced,
+    priceUnset,
     ratingLevels,
     ratingMode,
     year,
@@ -195,11 +201,13 @@ export default function ShowsPage() {
     venueIds,
     languageIds,
     channelIds,
+    languageUnset,
+    channelUnset,
     years,
     months,
     priceMin,
     priceMax,
-    includeUnpriced,
+    priceUnset,
     ratingLevels,
     ratingMode,
     year,
@@ -233,7 +241,7 @@ export default function ShowsPage() {
       setMonths([])
       setPriceMin(null)
       setPriceMax(null)
-      setIncludeUnpriced(false)
+      setPriceUnset(false)
       setRatingLevels([])
       setLanguageIds([])
       setChannelIds([])
@@ -288,6 +296,25 @@ export default function ShowsPage() {
     for (const list of map.values()) list.sort(bySort)
     return map
   }, [categories])
+  /**
+   * 「未填写二级类别」是挂在对应一级类别下的子项（一级类别是必填项，
+   * 所以它不能作为树表里的一级条目出现）。只在一级类别下真的存在
+   * 这类记录时才展示，避免出现选了永远为空的筛选项。
+   */
+  const unsetCat2ByParent = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const s of shows ?? []) {
+      if (s.categoryLevel2Id != null) continue
+      map.set(s.categoryLevel1Id, (map.get(s.categoryLevel1Id) ?? 0) + 1)
+    }
+    return map
+  }, [shows])
+  const cat2UnsetId = (parentId: string) => `unset:${parentId}`
+  /** 某个一级类别在筛选树里的全部子项 id：真实二级 + 可能的「未填写」 */
+  const categoryChildIds = (parentId: string) => [
+    ...(level2ByParent.get(parentId) ?? []).map((c) => c.id),
+    ...((unsetCat2ByParent.get(parentId) ?? 0) > 0 ? [cat2UnsetId(parentId)] : [])
+  ]
   const venuesByCity = useMemo(() => {
     const map = new Map<string, Venue[]>()
     for (const v of venues ?? []) {
@@ -315,11 +342,13 @@ export default function ShowsPage() {
     const ratingTargets = ratingLevels.filter((v) => v !== 'none').map(Number)
     return (shows ?? []).filter((s) => {
       if (statusSet.size > 0 && !statusSet.has(s.status)) return false
-      // 类别：一级与二级合并为一组，组内任一匹配（勾一级=涵盖其全部二级）
+      // 类别：一级、二级、二级未填写合并为一组，组内任一匹配（勾一级=涵盖其全部二级）
       if (cat1Set.size > 0 || cat2Set.size > 0) {
         const byCat1 = cat1Set.has(s.categoryLevel1Id)
         const byCat2 = s.categoryLevel2Id != null && cat2Set.has(s.categoryLevel2Id)
-        if (!byCat1 && !byCat2) return false
+        const byCat2Unset =
+          s.categoryLevel2Id == null && cat2Set.has(`unset:${s.categoryLevel1Id}`)
+        if (!byCat1 && !byCat2 && !byCat2Unset) return false
       }
       // 地点：城市与场馆合并为一组，组内任一匹配（勾城市=涵盖其全部场馆）
       if (citySet.size > 0 || venueSet.size > 0) {
@@ -329,19 +358,29 @@ export default function ShowsPage() {
       if (yearSet.size > 0 || monthSet.size > 0) {
         if (!yearSet.has(s.date.slice(0, 4)) && !monthSet.has(s.date.slice(0, 7))) return false
       }
-      // 价格：按人民币实付价区间（含上下限）；未填价格的记录默认排除，可用抽屉里的开关一并包含
-      if (priceMin != null || priceMax != null) {
+      // 价格：区间与「未填写」同组取并集
+      const hasPriceRange = priceMin != null || priceMax != null
+      if (hasPriceRange || priceUnset) {
         if (s.paidPrice == null) {
-          if (!includeUnpriced) return false
+          if (!priceUnset) return false
         } else {
+          // 只勾了「未填写」时，有价格的记录排除
+          if (!hasPriceRange) return false
           if (priceMin != null && s.paidPrice < priceMin) return false
           if (priceMax != null && s.paidPrice > priceMax) return false
         }
       }
-      if (languageSet.size > 0 && !(s.languageId != null && languageSet.has(s.languageId)))
-        return false
-      if (channelSet.size > 0 && !(s.ticketChannelId != null && channelSet.has(s.ticketChannelId)))
-        return false
+      // 语言 / 购票渠道：具体项与「未填写」同组取并集
+      if (languageSet.size > 0 || languageUnset) {
+        const byLanguage = s.languageId != null && languageSet.has(s.languageId)
+        const byLanguageUnset = languageUnset && s.languageId == null
+        if (!byLanguage && !byLanguageUnset) return false
+      }
+      if (channelSet.size > 0 || channelUnset) {
+        const byChannel = s.ticketChannelId != null && channelSet.has(s.ticketChannelId)
+        const byChannelUnset = channelUnset && s.ticketChannelId == null
+        if (!byChannel && !byChannelUnset) return false
+      }
       if (ratingLevels.length > 0) {
         if (s.rating == null) {
           if (!wantUnrated) return false
@@ -391,11 +430,13 @@ export default function ShowsPage() {
     months,
     priceMin,
     priceMax,
-    includeUnpriced,
+    priceUnset,
     ratingLevels,
     ratingMode,
     languageIds,
+    languageUnset,
     channelIds,
+    channelUnset,
     cities,
     venues,
     categories,
@@ -453,12 +494,22 @@ export default function ShowsPage() {
   }, [shows, year])
 
   // 左列角标：树状分组按「整选/半选的父级数」计数，其他分组按勾选项数计数
-  const catPartialCount = level1.filter((p) => {
-    const kids = level2ByParent.get(p.id) ?? []
-    if (kids.length === 0) return false
-    const checked = kids.filter((k) => cat2Ids.includes(k.id)).length
-    return checked > 0 && checked < kids.length
-  }).length
+  const catPartialParents = level1
+    .map((p) => p.id)
+    .filter((parentId) => {
+      const kids = categoryChildIds(parentId)
+      if (kids.length === 0) return false
+      const checked = kids.filter((k) => cat2Ids.includes(k)).length
+      return checked > 0 && checked < kids.length
+    })
+  const catPartialCount = catPartialParents.length
+  /** 只勾了某个父级下的「未填写」时，父级本身没被选中，要单独计入角标（避免重复计算） */
+  const cat2ExtraUnsetCount = cat2Ids.filter(
+    (id) =>
+      id.startsWith('unset:') &&
+      !cat1Ids.includes(id.slice('unset:'.length)) &&
+      !catPartialParents.includes(id.slice('unset:'.length))
+  ).length
   const cityPartialCount = (cities ?? []).filter((c) => {
     const kids = venuesByCity.get(c.id) ?? []
     if (kids.length === 0) return false
@@ -547,13 +598,14 @@ export default function ShowsPage() {
   }
   const tabCounts: Record<FilterTab, number> = {
     status: statuses.length,
-    category: cat1Ids.length + catPartialCount,
+    // 「未填写」子项已计入 cat2Ids，但被选中的父级会连带勾上它，避免重复计数
+    category: cat1Ids.length + catPartialCount + cat2ExtraUnsetCount,
     place: cityIds.length + cityPartialCount,
     time: years.length + timePartialCount,
-    price: priceMin != null || priceMax != null ? 1 : 0,
+    price: priceMin != null || priceMax != null || priceUnset ? 1 : 0,
     rating: ratingLevels.length,
-    language: languageIds.length,
-    channel: channelIds.length
+    language: languageIds.length + (languageUnset ? 1 : 0),
+    channel: channelIds.length + (channelUnset ? 1 : 0)
   }
   const activeFilterCount = FILTER_TABS.filter((t) => tabCounts[t.key] > 0).length
 
@@ -592,13 +644,15 @@ export default function ShowsPage() {
     setMonths([])
     setPriceMin(null)
     setPriceMax(null)
-    setIncludeUnpriced(false)
+    setPriceUnset(false)
     setRatingLevels([])
+    setLanguageUnset(false)
+    setChannelUnset(false)
   }
 
-  // 勾选一级类别 → 同步勾选其全部二级；取消则同步取消
+  // 勾选一级类别 → 同步勾选它下面的全部二级（含「未填写」）；取消则同步取消
   function toggleCat1(id: string, on: boolean) {
-    const kids = (level2ByParent.get(id) ?? []).map((c) => c.id)
+    const kids = categoryChildIds(id)
     setCat1Ids((prev) => toggleIn(prev, id, on))
     if (kids.length === 0) return
     setCat2Ids((prev) =>
@@ -606,9 +660,9 @@ export default function ShowsPage() {
     )
   }
 
-  // 勾选二级类别：全部二级都勾上时父级自动变为全选，部分勾选时父级为半选（不进入筛选条件）
+  // 勾选二级类别：该父级下全部二级 +「未填写」都勾上时父级才是全选，部分勾选为半选
   function toggleCat2(parentId: string, id: string, on: boolean) {
-    const kids = (level2ByParent.get(parentId) ?? []).map((c) => c.id)
+    const kids = categoryChildIds(parentId)
     const next = toggleIn(cat2Ids, id, on)
     setCat2Ids(next)
     const allChecked = kids.length > 0 && kids.every((k) => next.includes(k))
@@ -1062,16 +1116,20 @@ export default function ShowsPage() {
                     )}
                     {level1.map((parent) => {
                       const kids = level2ByParent.get(parent.id) ?? []
-                      const checkedCount = kids.filter((k) => cat2Ids.includes(k.id)).length
+                      const childIds = categoryChildIds(parent.id)
+                      const hasUnsetChild = (unsetCat2ByParent.get(parent.id) ?? 0) > 0
+                      const checkedCount = childIds.filter((id) => cat2Ids.includes(id)).length
                       const allChecked =
-                        kids.length > 0 ? checkedCount === kids.length : cat1Ids.includes(parent.id)
+                        childIds.length > 0
+                          ? checkedCount === childIds.length
+                          : cat1Ids.includes(parent.id)
                       const partial =
-                        kids.length > 0 && checkedCount > 0 && checkedCount < kids.length
+                        childIds.length > 0 && checkedCount > 0 && checkedCount < childIds.length
                       const open = isParentExpanded(parent.id, checkedCount > 0)
                       return (
                         <Fragment key={parent.id}>
                           <label className="filter-item parent">
-                            {kids.length > 0 ? (
+                            {childIds.length > 0 ? (
                               <button
                                 type="button"
                                 className={`filter-expand${open ? ' open' : ''}`}
@@ -1093,7 +1151,7 @@ export default function ShowsPage() {
                               checked={allChecked}
                               indeterminate={partial}
                               onChange={(on) =>
-                                kids.length > 0
+                                childIds.length > 0
                                   ? toggleCat1(parent.id, on)
                                   : setCat1Ids((prev) => toggleIn(prev, parent.id, on))
                               }
@@ -1109,6 +1167,18 @@ export default function ShowsPage() {
                               />
                             </label>
                           ))}
+                          {open && hasUnsetChild && (
+                            <label className="filter-item child">
+                              <span>未填写</span>
+                              <TriCheckbox
+                                checked={cat2Ids.includes(cat2UnsetId(parent.id))}
+                                indeterminate={false}
+                                onChange={(on) =>
+                                  toggleCat2(parent.id, cat2UnsetId(parent.id), on)
+                                }
+                              />
+                            </label>
+                          )}
                         </Fragment>
                       )
                     })}
@@ -1232,7 +1302,9 @@ export default function ShowsPage() {
 
                 {filterTab === 'price' && (
                   <>
-                    <p className="filter-panel-hint">按人民币实付价格筛选；未填价格的记录默认不参与</p>
+                    <p className="filter-panel-hint">
+                      按人民币实付价格筛选；勾「未填写」可看没填实付价格的记录
+                    </p>
                     <p className={`price-range-readout${priceActive ? '' : ' idle'}`}>
                       {priceRangeText}
                     </p>
@@ -1330,17 +1402,17 @@ export default function ShowsPage() {
                     </div>
                     <label className="price-toggle">
                       <span>
-                        包含未填价格的记录
+                        未填写
                         <small>
-                          {includeUnpriced
-                            ? `已开启：${unpricedCount} 场未填价格的记录也会一起显示`
-                            : `默认关闭：${unpricedCount} 场未填价格的记录会被排除`}
+                          {priceUnset
+                            ? `已勾选：${unpricedCount} 场未填实付价格的记录会一起显示`
+                            : `未勾选：${unpricedCount} 场未填实付价格的记录不会出现`}
                         </small>
                       </span>
                       <TriCheckbox
-                        checked={includeUnpriced}
+                        checked={priceUnset}
                         indeterminate={false}
-                        onChange={(on) => setIncludeUnpriced(on)}
+                        onChange={(on) => setPriceUnset(on)}
                       />
                     </label>
                   </>
@@ -1409,6 +1481,14 @@ export default function ShowsPage() {
                         />
                       </label>
                     ))}
+                    <label className="filter-item">
+                      <span>未填写</span>
+                      <TriCheckbox
+                        checked={languageUnset}
+                        indeterminate={false}
+                        onChange={(on) => setLanguageUnset(on)}
+                      />
+                    </label>
                   </>
                 )}
 
@@ -1428,6 +1508,14 @@ export default function ShowsPage() {
                         />
                       </label>
                     ))}
+                    <label className="filter-item">
+                      <span>未填写</span>
+                      <TriCheckbox
+                        checked={channelUnset}
+                        indeterminate={false}
+                        onChange={(on) => setChannelUnset(on)}
+                      />
+                    </label>
                   </>
                 )}
               </div>
