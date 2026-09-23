@@ -288,6 +288,16 @@ export const MAP_CITIES: MapCity[] = [
     ]
   },
   {
+    "name": "埼玉",
+    "lon": 139.65,
+    "lat": 35.86,
+    "aliases": [
+      "Saitama",
+      "さいたま",
+      "埼玉市"
+    ]
+  },
+  {
     "name": "大阪",
     "lon": 135.5,
     "lat": 34.69,
@@ -321,6 +331,16 @@ export const MAP_CITIES: MapCity[] = [
     "aliases": [
       "Seoul",
       "首尔市"
+    ]
+  },
+  {
+    "name": "仁川",
+    "lon": 126.71,
+    "lat": 37.46,
+    "aliases": [
+      "Incheon",
+      "Inchon",
+      "仁川市"
     ]
   },
   {
