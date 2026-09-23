@@ -171,7 +171,12 @@ export function CityMap({
 
     if (pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()]
-      gesture.current = { view, distance: Math.hypot(a.x - b.x, a.y - b.y), moved: false }
+      // 以「当前手势已经累计到的视图」为新起点：第一根手指可能已经拖动过
+      gesture.current = {
+        view: gesture.current?.view ?? view,
+        distance: Math.hypot(a.x - b.x, a.y - b.y),
+        moved: false
+      }
     }
   }
 
@@ -190,19 +195,29 @@ export function CityMap({
       const [a, b] = [...pointers.current.values()]
       const distance = Math.hypot(a.x - b.x, a.y - b.y)
       if (current.distance > 0 && distance > 0) {
-        setView(zoomMapView(current.view, current.distance / distance, toMapPoint(e, rect, current.view)))
+        const next = zoomMapView(
+          current.view,
+          current.distance / distance,
+          toMapPoint(e, rect, current.view)
+        )
+        // 手势内必须累计：下次移动要以这一次的结果为基础，否则每帧都从手势起点重算，缩放会打滑
+        current.view = next
+        current.distance = distance
+        setView(next)
       }
       return
     }
-    // 单指拖动平移
+    // 单指拖动平移：位移同样是「本次移动的增量」，必须累加到手势内的当前视图上。
+    // 之前这里用的是手势开始时的视图，于是每帧都变成「起点 + 几个像素」，
+    // 地图只在原位抖一下、看起来完全拖不动。
     const perPixel = 1 / (layoutOf(current.view).scale * rect.width)
-    setView(
-      panMapView(
-        current.view,
-        -(e.clientX - previous.x) * perPixel,
-        -(e.clientY - previous.y) * perPixel
-      )
+    const next = panMapView(
+      current.view,
+      -(e.clientX - previous.x) * perPixel,
+      -(e.clientY - previous.y) * perPixel
     )
+    current.view = next
+    setView(next)
   }
 
   function handlePointerUp(e: ReactPointerEvent<HTMLDivElement>) {
@@ -213,7 +228,12 @@ export function CityMap({
       return
     }
     const [a, b] = [...pointers.current.values()]
-    gesture.current = { view, distance: Math.hypot(a.x - b.x, a.y - b.y), moved: true }
+    // 抬起一根手指后继续用剩下的手指操作，起点取已累计的视图
+    gesture.current = {
+      view: gesture.current?.view ?? view,
+      distance: Math.hypot(a.x - b.x, a.y - b.y),
+      moved: true
+    }
   }
 
   return (
