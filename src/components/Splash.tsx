@@ -9,6 +9,26 @@ function sizeClass(length: number): 'short' | 'medium' | 'long' {
   return 'long'
 }
 
+/**
+ * 台词按语言分别指定字体。
+ * 原来所有语言共用一条字体栈，里面混了中文和韩文字体；在 iPhone 上汉字会落到
+ * 韩文字体 Apple SD Gothic Neo，它只有繁体体系字形，碰到简体字继续回退到系统
+ * 兜底字体，于是同一句里个别字明显更大。分语言后中文台词永远走中文字体。
+ */
+const QUOTE_FONTS: Record<string, { className: string; lang: string }> = {
+  中文: { className: 'lang-zh', lang: 'zh' },
+  韩语: { className: 'lang-ko', lang: 'ko' },
+  英语: { className: 'lang-latin', lang: 'en' },
+  法语: { className: 'lang-latin', lang: 'fr' },
+  德语: { className: 'lang-latin', lang: 'de' },
+  俄语: { className: 'lang-latin', lang: 'ru' },
+}
+
+function quoteFont(lang: string): { className: string; lang: string } {
+  // 未知语言落到拉丁字体栈，并交给 lang 属性让系统按语言挑兜底字体
+  return QUOTE_FONTS[lang] ?? { className: 'lang-latin', lang: '' }
+}
+
 export function Splash({ onDone }: { onDone: () => void }) {
   const quote = useMemo<Quote>(
     () => QUOTES[Math.floor(Math.random() * QUOTES.length)],
@@ -16,6 +36,7 @@ export function Splash({ onDone }: { onDone: () => void }) {
   )
   const showTrans = quote.lang !== '中文' && quote.lang !== '英语' && Boolean(quote.translation)
   const size = sizeClass(quote.original.length)
+  const font = quoteFont(quote.lang)
   const [phase, setPhase] = useState<'closed' | 'opening' | 'leaving'>('closed')
   const doneRef = useRef(false)
   const reduced = useMemo(
@@ -79,7 +100,9 @@ export function Splash({ onDone }: { onDone: () => void }) {
       <div className="splash-quote-wrap">
         <div className={`splash-quote size-${size}`}>
           <blockquote>
-            <p className="quote-original">{quote.original}</p>
+            <p className={`quote-original ${font.className}`} lang={font.lang || undefined}>
+              {quote.original}
+            </p>
             {showTrans && <p className="quote-trans">{quote.translation}</p>}
           </blockquote>
           <figcaption className="quote-source">——{quote.play}</figcaption>
