@@ -15,6 +15,14 @@ export function formatFullDate(date: string): string {
   return `${y}年${Number(m)}月${Number(d)}日`
 }
 
+/** ISO 时间字符串 → YYYY-MM-DD HH:mm（本地时区，用于「最近一次导出」这类时间戳）。 */
+export function formatDateTime(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 export function formatMoney(value?: number): string {
   if (value == null) return '—'
   return `¥${value.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`
