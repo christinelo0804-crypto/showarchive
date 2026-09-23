@@ -11,9 +11,12 @@ import { consumeShowsLanding, onShowsLanding } from '../lib/showsLanding'
 import { coverColors, coverSize } from '../lib/posterCover'
 import { formatDateWithYear, formatMoney } from '../lib/format'
 import { PRICE_BUCKETS } from '../lib/stats'
+import { MAP_CITY_COUNT, matchMapCity } from '../lib/mapGeo'
+import type { MapCity } from '../lib/mapGeo'
+import { CityMap, DOT_TIERS } from '../components/CityMap'
 import type { Category, Show, Venue } from '../types'
 
-type ViewMode = 'list' | 'calendar' | 'timeline'
+type ViewMode = 'list' | 'calendar' | 'timeline' | 'map'
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 const MONTH_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
@@ -168,6 +171,7 @@ export default function ShowsPage() {
   const calendarMenuRef = useRef<HTMLHeadingElement | null>(null)
   const [selectedDate, setSelectedDate] = useState<string | null>(cached?.selectedDate ?? null)
   const [daySheetOpen, setDaySheetOpen] = useState(false)
+  const [mapCityName, setMapCityName] = useState<string | null>(null)
   const stateRef = useRef({
     view,
     query,
@@ -521,6 +525,71 @@ export default function ShowsPage() {
     return checked > 0 && checked < list.length
   }).length
 
+  /**
+   * 地图视图的城市聚合：只统计当前筛选结果，因此筛「2025 年」后地图只点亮 2025 年去过的城市。
+   * 城市按内置清单匹配（名称 + 别名），清单外的城市不进地图，只在提示里列出。
+   */
+  const mapData = useMemo(() => {
+    const mapped = new Map<
+      string,
+      { city: MapCity; ids: Set<string>; count: number; venues: Map<string, number>; lastDate: string }
+    >()
+    const unlisted = new Map<string, number>()
+    for (const show of filtered) {
+      const raw = cityNameMap.get(show.cityId) ?? ''
+      const city = matchMapCity(raw)
+      if (!city) {
+        if (raw) unlisted.set(raw, (unlisted.get(raw) ?? 0) + 1)
+        continue
+      }
+      const entry =
+        mapped.get(city.name) ??
+        { city, ids: new Set<string>(), count: 0, venues: new Map<string, number>(), lastDate: '' }
+      entry.ids.add(show.cityId)
+      entry.count += 1
+      const venue = venueNameMap.get(show.venueId)
+      if (venue) entry.venues.set(venue, (entry.venues.get(venue) ?? 0) + 1)
+      if (show.date > entry.lastDate) entry.lastDate = show.date
+      mapped.set(city.name, entry)
+    }
+    const cities = [...mapped.values()].sort(
+      (a, b) => b.count - a.count || a.city.name.localeCompare(b.city.name, 'zh-CN')
+    )
+    const unlistedList = [...unlisted.entries()].sort(
+      (a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-CN')
+    )
+    return {
+      cities,
+      unlisted: unlistedList,
+      showsInUnlisted: unlistedList.reduce((sum, [, count]) => sum + count, 0)
+    }
+  }, [filtered, cityNameMap, venueNameMap])
+  const mapSheetCity = mapCityName
+    ? (mapData.cities.find((entry) => entry.city.name === mapCityName) ?? null)
+    : null
+
+  /** 从地图上的城市跳到「列表 + 地点＝该城市」：清掉其他筛选条件，避免结果难以理解 */
+  function showCityShows(cityIdSet: Set<string>) {
+    setStatuses([])
+    setCat1Ids([])
+    setCat2Ids([])
+    setVenueIds([])
+    setYears([])
+    setMonths([])
+    setRatingLevels([])
+    setLanguageIds([])
+    setChannelIds([])
+    setLanguageUnset(false)
+    setChannelUnset(false)
+    setPriceMin(null)
+    setPriceMax(null)
+    setPriceUnset(false)
+    setQuery('')
+    setCityIds([...cityIdSet])
+    setMapCityName(null)
+    setView('list')
+  }
+
   // 价格筛选：滑块上限取数据里最高实付价向上取整到 500 的倍数（至少 2000，保证快捷档位够用）
   const priceSliderMax = useMemo(() => {
     let maxPaid = 0
@@ -803,7 +872,8 @@ export default function ShowsPage() {
         eyebrow="Archive"
         title="我的演出"
         action={
-          <div className="segmented">
+          // 模式切换回到标题右侧（紧凑版）：手机上标题 + 四个模式 ≈ 305px，390/375 屏都放得下，更窄时自动换行
+          <div className="segmented view-switch">
             <button
               type="button"
               className={view === 'list' ? 'seg-active' : ''}
@@ -825,44 +895,55 @@ export default function ShowsPage() {
             >
               时间线
             </button>
+            <button
+              type="button"
+              className={view === 'map' ? 'seg-active' : ''}
+              onClick={() => setView('map')}
+            >
+              地图
+            </button>
           </div>
         }
       />
 
-      <div className="toolbar">
-        <input
-          className="input toolbar-search"
-          type="search"
-          placeholder="搜索名称、阵容、评价、备注…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          aria-label="搜索"
-        />
-        <button
-          type="button"
-          className={`filter-trigger ${activeFilterCount > 0 ? 'filter-trigger-active' : ''}`}
-          onClick={() => setFilterOpen(true)}
-        >
-          <span>筛选</span>
-          {activeFilterCount > 0 && <span className="filter-badge">{activeFilterCount}</span>}
-        </button>
-        <Link className="count-chip" to="/drafts">
-          <span>草稿</span>
-          <span className="draft-num">{drafts?.length ?? 0}</span>
-        </Link>
-      </div>
+      {view !== 'map' && (
+        <div className="toolbar">
+          <input
+            className="input toolbar-search"
+            type="search"
+            placeholder="搜索名称、阵容、评价、备注…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="搜索"
+          />
+          <button
+            type="button"
+            className={`filter-trigger ${activeFilterCount > 0 ? 'filter-trigger-active' : ''}`}
+            onClick={() => setFilterOpen(true)}
+          >
+            <span>筛选</span>
+            {activeFilterCount > 0 && <span className="filter-badge">{activeFilterCount}</span>}
+          </button>
+          <Link className="count-chip" to="/drafts">
+            <span>草稿</span>
+            <span className="draft-num">{drafts?.length ?? 0}</span>
+          </Link>
+        </div>
+      )}
 
-      <div className="show-count">
-        {hasConditions ? (
-          <>
-            筛选后 <b>{filtered.length}</b> 场 · 共 {totalCount} 场
-          </>
-        ) : (
-          <>
-            共 <b>{totalCount}</b> 场
-          </>
-        )}
-      </div>
+      {view !== 'map' && (
+        <div className="show-count">
+          {hasConditions ? (
+            <>
+              筛选后 <b>{filtered.length}</b> 场 · 共 {totalCount} 场
+            </>
+          ) : (
+            <>
+              共 <b>{totalCount}</b> 场
+            </>
+          )}
+        </div>
+      )}
 
       {view === 'list' ? (
         filtered.length === 0 ? (
@@ -1027,6 +1108,96 @@ export default function ShowsPage() {
               )
             })}
           </div>
+        </>
+      ) : view === 'map' ? (
+        <>
+          <div className="map-summary">
+            <div className="map-summary-text">
+              <p className="map-summary-main">
+                去过 <b>{mapData.cities.length}</b> 个城市 · 共 <b>{filtered.length}</b> 场
+              </p>
+              <p className="map-summary-note">
+                {activeFilterCount > 0 ? '已应用筛选条件 · ' : ''}
+                地图收录 {MAP_CITY_COUNT} 个城市
+              </p>
+            </div>
+            {/* 地图模式不显示工具栏，筛选按钮放在统计行最右侧 */}
+            <button
+              type="button"
+              className={`filter-trigger ${activeFilterCount > 0 ? 'filter-trigger-active' : ''}`}
+              onClick={() => setFilterOpen(true)}
+            >
+              <span>筛选</span>
+              {activeFilterCount > 0 && <span className="filter-badge">{activeFilterCount}</span>}
+            </button>
+          </div>
+
+          {mapData.cities.length === 0 ? (
+            shows === undefined ? (
+              <p className="muted">读取中…</p>
+            ) : (
+              <EmptyState
+                title={filtered.length === 0 ? '没有符合条件的记录' : '还没有点亮的城市'}
+                hint={
+                  filtered.length === 0
+                    ? '换个关键词，或调整筛选条件。'
+                    : '演出的城市都不在地图收录范围内，可在下方清单里查看提示。'
+                }
+              />
+            )
+          ) : (
+            <>
+              <CityMap
+                points={mapData.cities.map((entry) => ({ city: entry.city, count: entry.count }))}
+                onSelect={(city) => setMapCityName(city.name)}
+              />
+              <div className="map-legend">
+                {DOT_TIERS.map((tier) => (
+                  <span key={tier.label}>
+                    <i
+                      className={`city-dot-visual${tier.glow ? ' city-dot-strong' : ''}`}
+                      style={{
+                        width: `${14 * tier.scale}px`,
+                        height: `${14 * tier.scale}px`,
+                        opacity: tier.opacity
+                      }}
+                    />
+                    {tier.label}
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
+
+          {mapData.cities.length > 0 && (
+            <>
+              <p className="section-kicker">Visited</p>
+              <div className="city-list">
+                {mapData.cities.map((entry) => (
+                  <button
+                    key={entry.city.name}
+                    type="button"
+                    className="city-row"
+                    onClick={() => setMapCityName(entry.city.name)}
+                  >
+                    <span className="city-name">{entry.city.name}</span>
+                    <span className="city-meta">{entry.venues.size} 个场馆</span>
+                    <span className="city-count">{entry.count} 场</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {mapData.unlisted.length > 0 && (
+            <p className="map-unlisted">
+              另有 {mapData.unlisted.length} 个城市未收录到地图（
+              {mapData.unlisted
+                .map(([name, count]) => `${name} ${count} 场`)
+                .join('、')}
+              ），不影响记录与统计。
+            </p>
+          )}
         </>
       ) : filtered.length === 0 ? (
         shows === undefined ? (
@@ -1594,6 +1765,45 @@ export default function ShowsPage() {
                   </Link>
                 )
               })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mapSheetCity && (
+        <div className="drawer-overlay" onClick={() => setMapCityName(null)}>
+          <div className="drawer day-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="day-sheet-head">
+              <h3>{mapSheetCity.city.name}</h3>
+              <span className="day-sheet-count">
+                {mapSheetCity.count} 场演出 · {mapSheetCity.venues.size} 个场馆
+              </span>
+              <button
+                type="button"
+                className="day-sheet-close"
+                onClick={() => setMapCityName(null)}
+                aria-label="关闭"
+              >
+                ×
+              </button>
+            </div>
+            <div className="day-sheet-list">
+              {[...mapSheetCity.venues.entries()]
+                .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-CN'))
+                .map(([venue, count]) => (
+                  <div key={venue} className="venue-row">
+                    <span className="venue-name">{venue}</span>
+                    <span className="venue-count">{count} 场</span>
+                  </div>
+                ))}
+              <p className="muted note-sm">
+                最近一次：{formatDateWithYear(mapSheetCity.lastDate)}
+              </p>
+            </div>
+            <div className="drawer-foot">
+              <Button type="button" onClick={() => showCityShows(mapSheetCity.ids)}>
+                查看这个城市的演出
+              </Button>
             </div>
           </div>
         </div>

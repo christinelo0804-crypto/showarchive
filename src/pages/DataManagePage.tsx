@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { useCachedLiveQuery } from '../lib/liveCache'
-import { todayISO } from '../lib/format'
+import { formatDateTime, todayISO } from '../lib/format'
+import { nowIso } from '../lib/id'
 import { Button, PageHeader, SectionTitle } from '../components/ui'
 import { Modal } from '../components/Modal'
 import { useToast } from '../components/Toast'
@@ -19,10 +20,16 @@ import { clearAllData, getDataOverview } from '../db/repositories'
 
 type ImportMode = 'merge' | 'replace'
 
+/** 「最近一次导出」是设备本地信息，不进档案，用 localStorage 记录。 */
+const LAST_EXPORT_KEY = 'showarchive-last-export'
+
 export default function DataManagePage() {
   const toast = useToast()
   const overview = useCachedLiveQuery('data:overview', () => getDataOverview())
   const fileRef = useRef<HTMLInputElement | null>(null)
+  const [lastExport, setLastExport] = useState<string | null>(() =>
+    localStorage.getItem(LAST_EXPORT_KEY)
+  )
 
   const [busy, setBusy] = useState(false)
   const [parsed, setParsed] = useState<ParsedArchive | null>(null)
@@ -39,6 +46,9 @@ export default function DataManagePage() {
       const blob = await buildArchiveBlob(result)
       const filename = `ShowArchive-${todayISO()}.showarchive`
       downloadBlob(blob, filename)
+      const exportedAt = nowIso()
+      localStorage.setItem(LAST_EXPORT_KEY, exportedAt)
+      setLastExport(exportedAt)
       toast.push('success', `已导出 ${result.data.shows.length} 条记录`)
     } catch (err) {
       toast.push('error', err instanceof Error ? err.message : '导出失败')
@@ -181,11 +191,18 @@ export default function DataManagePage() {
         <SectionTitle kicker="Actions">操作</SectionTitle>
         <div className="settings-list">
           <button type="button" className="settings-row" onClick={() => void handleExport()} disabled={busy}>
-            <span className="settings-row-name">创建备份</span>
+            <span className="settings-row-text">
+              <span className="settings-row-name">导出数据</span>
+              <span className="settings-row-note">
+                {lastExport
+                  ? `最近一次导出：${formatDateTime(lastExport)}`
+                  : '还没有导出过数据'}
+              </span>
+            </span>
             <span aria-hidden="true">↓</span>
           </button>
           <button type="button" className="settings-row" onClick={() => openFilePicker()} disabled={busy}>
-            <span className="settings-row-name">导入档案</span>
+            <span className="settings-row-name">导入数据</span>
             <span aria-hidden="true">↑</span>
           </button>
           <button
@@ -209,7 +226,7 @@ export default function DataManagePage() {
 
       <Modal
         open={parsed != null}
-        title="导入档案"
+        title="导入数据"
         onClose={() => setParsed(null)}
         footer={importFooter}
       >
@@ -283,7 +300,7 @@ export default function DataManagePage() {
         <p className="modal-alert">
           此操作将永久删除本机全部演出记录、分类、城市、场馆、语言与购票渠道，且无法撤销。
         </p>
-        <p className="muted">强烈建议先创建备份，再执行删除。</p>
+        <p className="muted">强烈建议先导出数据，再执行删除。</p>
         <label className="check-row">
           <input type="checkbox" checked={deleteAck} onChange={(e) => setDeleteAck(e.target.checked)} />
           <span className="ack-text">我已确认并理解后果</span>
